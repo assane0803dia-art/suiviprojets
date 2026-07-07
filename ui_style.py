@@ -83,6 +83,23 @@ def inject_global_style():
     )
 
 
+def tip(key, text):
+    """Astuce discrète et masquable, affichée une fois par section (par clé unique)."""
+    if st.session_state.get(f"tip_hidden_{key}"):
+        return
+    col1, col2 = st.columns([25, 1])
+    with col1:
+        st.markdown(
+            f'<div style="background-color:#EEF2FF; border-radius:8px; padding:8px 14px; '
+            f'font-size:0.85rem; color:{PRIMARY_DARK}; margin-bottom:8px;">💡 {text}</div>',
+            unsafe_allow_html=True,
+        )
+    with col2:
+        if st.button("✕", key=f"tip_close_{key}", help="Masquer cette astuce"):
+            st.session_state[f"tip_hidden_{key}"] = True
+            st.rerun()
+
+
 def sidebar_brand():
     with st.sidebar:
         st.markdown(

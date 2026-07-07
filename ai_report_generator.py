@@ -74,17 +74,31 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
     nb_taches_terminees = sum(1 for t in snapshot.taches if t.get("statut") == "Terminé")
     taux_avancement = (nb_taches_terminees / nb_taches * 100) if nb_taches else 0
 
+    nb_activites = len(snapshot.activites)
+    nb_activites_terminees = sum(1 for a in snapshot.activites if a.get("statut") == "Terminé")
+    budget_active_total = sum(a.get("budget") or 0 for a in snapshot.activites)
+
+    dates_debut = [a.get("date_debut") for a in snapshot.activites if a.get("date_debut")] + \
+                  [t.get("date_debut") for t in snapshot.taches if t.get("date_debut")]
+    dates_fin = [a.get("date_fin") for a in snapshot.activites if a.get("date_fin")] + \
+                [t.get("date_fin") for t in snapshot.taches if t.get("date_fin")]
+    periode_min = min(dates_debut) if dates_debut else None
+    periode_max = max(dates_fin) if dates_fin else None
+
     lignes = [
         f"Projet : {projet.get('nom')}",
-        f"Description : {projet.get('description') or 'N/A'}",
-        f"Statut : {projet.get('statut')}",
-        f"Budget global : {projet.get('budget') or 0} FCFA",
+        f"Description (sert de base au Contexte) : {projet.get('description') or 'N/A'}",
+        f"Statut actuel : {projet.get('statut')}",
+        f"Dates prévues du projet : {projet.get('date_debut') or 'N/A'} au {projet.get('date_fin') or 'N/A'}",
+        f"Budget global déclaré : {projet.get('budget') or 0} FCFA",
+        f"Somme des budgets d'activités : {budget_active_total:.0f} FCFA",
+        f"Période effective d'activités/tâches observée : {periode_min or 'N/A'} au {periode_max or 'N/A'}",
         f"Nombre d'objectifs : {len(snapshot.objectifs)}",
         f"Nombre de résultats attendus : {len(snapshot.resultats)}",
-        f"Nombre d'activités : {len(snapshot.activites)}",
+        f"Nombre d'activités : {nb_activites} (dont {nb_activites_terminees} terminées)",
         f"Nombre de tâches : {nb_taches} (dont {nb_taches_terminees} terminées, soit {taux_avancement:.0f}%)",
         "",
-        "OBJECTIFS ET RÉSULTATS ATTENDUS :",
+        "OBJECTIFS ET RÉSULTATS ATTENDUS (avec indicateurs) :",
     ]
     for o in snapshot.objectifs:
         lignes.append(f"- [{o.get('type_objectif')}] {o.get('titre')}")
@@ -95,6 +109,11 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
             f"  • Résultat « {r.get('titre')} » — indicateur : {r.get('indicateur') or 'N/A'} "
             f"({actuelle}/{cible} {r.get('unite') or ''})"
         )
+
+    lignes.append("")
+    lignes.append("ACTIVITÉS (réalisées ou en cours) :")
+    for a in snapshot.activites:
+        lignes.append(f"- {a.get('titre')} — statut : {a.get('statut')}, progression : {a.get('progression') or 0}%")
 
     lignes.append("")
     lignes.append("ACTIVITÉS EN RETARD (date de fin dépassée, non terminées) :")
@@ -115,20 +134,33 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
     donnees = "\n".join(lignes)
 
     return f"""Tu es un assistant spécialisé en gestion de projet. Rédige un rapport d'exécution
-professionnel en français, basé UNIQUEMENT sur les données ci-dessous (n'invente aucun chiffre).
+complet et professionnel en français, basé UNIQUEMENT sur les données ci-dessous (n'invente
+aucun chiffre, aucune date, aucun fait qui n'y figure pas).
 
 DONNÉES DU PROJET :
 {donnees}
 
 Structure attendue du rapport (utilise des titres Markdown ## et des listes à puces -) :
 ## Résumé exécutif
-## État d'avancement par objectif
-## Indicateurs clés
-## Retards et risques identifiés
+## Contexte
+(déduis le contexte à partir de la description du projet — reste factuel)
+## Problématique
+(le problème que le projet cherche à résoudre, déduit du contexte et des objectifs)
+## Objectifs
+## Résultats attendus
+## Activités réalisées
+## Indicateurs
+## Risques identifiés
+## Budget
+## Calendrier
+## Conclusion
 ## Recommandations
 
-Reste factuel, concis (300-500 mots), et professionnel. Si une section n'a pas de données
-suffisantes, indique-le brièvement plutôt que d'inventer du contenu."""
+Consignes :
+- Si une section manque de données suffisantes (ex: pas de description fournie pour le
+  Contexte), indique-le brièvement ("Non renseigné" ou équivalent) plutôt que d'inventer.
+- Reste factuel et professionnel, 500-800 mots au total.
+- N'utilise pas de tableaux Markdown, uniquement des paragraphes et des listes à puces."""
 
 
 def generate_recommendations(snapshot: ProjectSnapshot, risques: dict) -> str:
@@ -175,7 +207,7 @@ actionnables pour un chef de projet. Sois direct, sans préambule ni conclusion.
     return "".join(block.text for block in response.content if hasattr(block, "text"))
 
 
-def generate_execution_report(snapshot: ProjectSnapshot) -> str:
+def generate_execution_report(snapshot: ProjectSnapshot, model: str = "claude-sonnet-5") -> str:
     """Génère un rapport d'exécution via l'API Anthropic Claude."""
     api_key = st.secrets.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -188,8 +220,8 @@ def generate_execution_report(snapshot: ProjectSnapshot) -> str:
 
     client = anthropic.Anthropic(api_key=api_key)
     response = client.messages.create(
-        model="claude-sonnet-5",
-        max_tokens=1500,
+        model=model,
+        max_tokens=2500,
         messages=[{"role": "user", "content": prompt}],
     )
 

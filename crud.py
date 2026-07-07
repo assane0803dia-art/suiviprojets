@@ -351,6 +351,31 @@ def update_resultat_valeur_actuelle(id, valeur_actuelle):
 
 
 # ----------------------------------------------------------------------------
+# Rapports sauvegardés
+# ----------------------------------------------------------------------------
+def get_rapports(projet_id):
+    return run_query(
+        """SELECT R.id, R.titre, R.contenu, R.date_creation, U.username AS cree_par
+           FROM Rapports R
+           LEFT JOIN Users U ON R.cree_par = U.id
+           WHERE R.projet_id = %s
+           ORDER BY R.date_creation DESC""",
+        params=(projet_id,),
+    )
+
+
+def create_rapport(projet_id, titre, contenu, cree_par):
+    return run_execute(
+        "INSERT INTO Rapports (projet_id, titre, contenu, cree_par) VALUES (%s, %s, %s, %s) RETURNING id",
+        (projet_id, titre, contenu, cree_par),
+    )
+
+
+def delete_rapport(id):
+    run_execute("DELETE FROM Rapports WHERE id=%s", (id,))
+
+
+# ----------------------------------------------------------------------------
 # Parties prenantes
 # ----------------------------------------------------------------------------
 def get_parties_prenantes(projet_id):

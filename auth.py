@@ -15,7 +15,7 @@ def verify_credentials(username: str, password: str):
 
     row = df.iloc[0]
     if bcrypt.checkpw(password.encode("utf-8"), row["password_hash"].encode("utf-8")):
-        return {"id": row["id"], "username": row["username"], "role": row["role"]}
+        return {"id": int(row["id"]), "username": str(row["username"]), "role": str(row["role"])}
 
     return None
 

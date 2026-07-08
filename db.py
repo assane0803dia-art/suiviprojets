@@ -16,7 +16,24 @@ tableau de bord Streamlit Cloud (en production) :
 import psycopg2
 from psycopg2 import pool
 import pandas as pd
+import numpy as np
 import streamlit as st
+
+
+def _to_native(value):
+    """Convertit les types numpy/pandas (int64, bool_...) en types Python natifs,
+    que psycopg2 ne sait pas gérer directement."""
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    return value
+
+
+def _convert_params(params):
+    if params is None:
+        return None
+    return tuple(_to_native(p) for p in params)
 
 
 @st.cache_resource
@@ -53,7 +70,7 @@ def run_query(query, params=None):
     """Exécute une requête SELECT et retourne un DataFrame pandas."""
     conn = get_connection()
     try:
-        return pd.read_sql(query, conn, params=params)
+        return pd.read_sql(query, conn, params=_convert_params(params))
     except Exception:
         conn.rollback()
         raise
@@ -69,6 +86,7 @@ def run_execute(query, params=None):
     conn = get_connection()
     try:
         cursor = conn.cursor()
+        params = _convert_params(params)
         if params:
             cursor.execute(query, params)
         else:

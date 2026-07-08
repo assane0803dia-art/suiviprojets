@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import require_login, logout_button
-from ui_style import sidebar_brand, section_title, badge_html
+from ui_style import sidebar_brand, section_title, badge_html, tip
 import crud
 import ai_report_generator as ai
 
@@ -23,6 +23,7 @@ if projets_df.empty:
 # Détection des risques — calcul instantané, sans appel IA
 # ----------------------------------------------------------------------------
 section_title("⚠️", "Risques détectés sur l'ensemble des projets")
+tip("risques_probabilite_impact", "Pour bien qualifier un risque, indiquez sa probabilité et son impact — cela aide à prioriser les actions correctives.")
 st.caption("Calcul automatique et instantané (dates dépassées, statut non terminé) — aucun appel à l'IA n'est nécessaire pour cette partie.")
 
 total_activites_retard = 0

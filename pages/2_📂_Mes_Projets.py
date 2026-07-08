@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from auth import require_login, logout_button
-from ui_style import sidebar_brand, section_title, badge_html
+from ui_style import sidebar_brand, section_title, badge_html, tip
 import ui_style
 import crud
 import validators
@@ -235,6 +235,7 @@ with col_close:
 if is_lecteur:
     if active == "objectifs":
         section_title("🎯", "Objectifs spécifiques", ui_style.SECTION_HELP["objectifs"])
+        tip("objectifs_smart", "Utilisez des objectifs SMART : Spécifiques, Mesurables, Atteignables, Réalistes, Temporellement définis.")
         if objectifs_df.empty:
             st.info("Aucun objectif pour ce projet.")
         else:
@@ -247,6 +248,7 @@ if is_lecteur:
 
     elif active == "resultats":
         section_title("📈", "Résultats attendus", ui_style.SECTION_HELP["resultats"])
+        tip("resultats_indicateurs", "Les indicateurs doivent être mesurables — préférez un chiffre précis à une appréciation générale.")
         if resultats_df.empty:
             st.info("Aucun résultat attendu pour ce projet.")
         else:
@@ -286,6 +288,7 @@ if is_lecteur:
 
     elif active == "indicateurs":
         section_title("📊", "Indicateurs de suivi")
+        tip("indicateurs_mesurables", "Les indicateurs doivent être mesurables : donnez toujours une valeur cible et une unité claire.")
         indicateurs_df_ro = resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")] if not resultats_df.empty else resultats_df
         if indicateurs_df_ro.empty:
             st.info("Aucun indicateur défini pour ce projet.")
@@ -300,6 +303,7 @@ if is_lecteur:
 
     elif active == "budget":
         section_title("💰", "Budget du projet")
+        tip("budget_fixe_variable", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
         budget_projet_ro = float(projet_row["budget"] or 0)
         budget_active_ro = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0
         c1, c2 = st.columns(2)
@@ -352,6 +356,7 @@ if is_lecteur:
 else:
     if active == "objectifs":
         section_title("🎯", "Objectifs spécifiques", ui_style.SECTION_HELP["objectifs"])
+        tip("objectifs_smart_2", "Utilisez des objectifs SMART : Spécifiques, Mesurables, Atteignables, Réalistes, Temporellement définis.")
 
         with st.expander("➕ Ajouter un objectif"):
             type_objectif_new = st.selectbox("Type", crud.TYPES_OBJECTIF, key="type_new_obj")
@@ -417,6 +422,7 @@ else:
     # ==============================================================================
     elif active == "resultats":
         section_title("📈", "Résultats attendus", ui_style.SECTION_HELP["resultats"])
+        tip("resultats_indicateurs_2", "Les indicateurs doivent être mesurables — préférez un chiffre précis à une appréciation générale.")
 
         if objectifs_df.empty:
             st.warning("Créez d'abord un objectif pour pouvoir y attacher un résultat.")
@@ -668,6 +674,7 @@ else:
     # ==============================================================================
     elif active == "indicateurs":
         section_title("📊", "Indicateurs de suivi")
+        tip("indicateurs_mesurables_2", "Les indicateurs doivent être mesurables : donnez toujours une valeur cible et une unité claire.")
         st.caption("Mettez à jour rapidement la valeur actuelle de chaque indicateur, sans naviguer dans la hiérarchie.")
 
         indicateurs_df = resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")] if not resultats_df.empty else resultats_df
@@ -703,6 +710,7 @@ else:
     # ==============================================================================
     elif active == "budget":
         section_title("💰", "Budget du projet")
+        tip("budget_fixe_variable_2", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
 
         budget_projet = float(projet_row["budget"] or 0)
         budget_active = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0

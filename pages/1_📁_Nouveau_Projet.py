@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import require_login, logout_button
-from ui_style import sidebar_brand, section_title
+from ui_style import sidebar_brand, section_title, tip
 import crud
 import validators
 
@@ -14,6 +14,7 @@ st.caption("Créez votre projet en quelques secondes. Vous compléterez objectif
 st.divider()
 
 section_title("📌", "Informations de base")
+tip("nouveau_projet_contexte", "Décrivez brièvement le problème auquel votre projet répond — cette description sert de base au Contexte du rapport IA.")
 
 with st.form("form_new_projet_quick", clear_on_submit=True):
     nom = st.text_input("Nom du projet *")

@@ -56,7 +56,7 @@ st.divider()
 # Génération / régénération / édition
 # ==============================================================================
 section_title("🤖", "Rapport d'exécution")
-tip("rapport_ia", "Le rapport couvre : résumé, contexte, problématique, objectifs, résultats, activités, indicateurs, risques, budget, calendrier, conclusion et recommandations.")
+tip("rapport_ia", "Vérifiez le rapport avant export — le contenu ci-dessous est entièrement modifiable. Sections couvertes : résumé, contexte, problématique, objectifs, résultats, activités, indicateurs, risques, budget, calendrier, conclusion et recommandations.")
 
 modele_prefere = (profile or {}).get("ia_modele") or "claude-sonnet-5"
 

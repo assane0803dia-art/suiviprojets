@@ -35,7 +35,11 @@ def _get_pool():
 
 def get_connection():
     """Emprunte une connexion au pool. Doit être rendue avec release_connection()."""
-    return _get_pool().getconn()
+    conn = _get_pool().getconn()
+    if conn.get_transaction_status() != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+        # Connexion laissée dans un état incertain par un appel précédent — on la nettoie.
+        conn.rollback()
+    return conn
 
 
 def release_connection(conn, discard=False):
@@ -50,6 +54,9 @@ def run_query(query, params=None):
     conn = get_connection()
     try:
         return pd.read_sql(query, conn, params=params)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         release_connection(conn)
 

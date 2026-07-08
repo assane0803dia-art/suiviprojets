@@ -27,7 +27,8 @@ except Exception as e:
     st.error(f"Impossible de se connecter à la base de données : {e}")
     st.stop()
 
-NOM_COLONNE_PROJET = "Projet"
+NOM_COLONNE_PROJET = "projet"
+NOM_COLONNE_PROGRESSION = "progression_projet"
 
 col_title, col_refresh = st.columns([6, 1])
 with col_title:
@@ -81,11 +82,11 @@ if not graphiques.empty:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-            elif row["cle"] == "graph_progression_projet" and "Progression_Projet" in df.columns:
+            elif row["cle"] == "graph_progression_projet" and NOM_COLONNE_PROGRESSION in df.columns:
                 fig = px.bar(
-                    df.sort_values("Progression_Projet", ascending=True),
-                    x="Progression_Projet", y=NOM_COLONNE_PROJET, orientation="h",
-                    text_auto=".0f", color="Progression_Projet",
+                    df.sort_values(NOM_COLONNE_PROGRESSION, ascending=True),
+                    x=NOM_COLONNE_PROGRESSION, y=NOM_COLONNE_PROJET, orientation="h",
+                    text_auto=".0f", color=NOM_COLONNE_PROGRESSION,
                     color_continuous_scale=["#F59E0B", "#16A34A"], range_color=[0, 100],
                 )
                 fig.update_layout(
@@ -102,8 +103,8 @@ section_title("📋", "Détail des projets")
 column_config = {}
 if "budget" in df.columns:
     column_config["budget"] = st.column_config.NumberColumn("Budget (FCFA)", format="%,.0f")
-if "Progression_Projet" in df.columns:
-    column_config["Progression_Projet"] = st.column_config.ProgressColumn(
+if NOM_COLONNE_PROGRESSION in df.columns:
+    column_config[NOM_COLONNE_PROGRESSION] = st.column_config.ProgressColumn(
         "Progression", min_value=0, max_value=100, format="%.0f%%"
     )
 

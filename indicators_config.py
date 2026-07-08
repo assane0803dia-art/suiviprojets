@@ -30,8 +30,16 @@ def compute_kpi_value(row: pd.Series, df: pd.DataFrame):
     if agregation == "count":
         return len(df)
 
-    if colonne not in df.columns:
+    if colonne is None:
         return None
+
+    # PostgreSQL renvoie les noms de colonnes non cités en minuscules, même si
+    # colonne_source a été enregistré avec une autre casse (ex: "Progression_Projet").
+    if colonne not in df.columns:
+        colonnes_par_minuscule = {c.lower(): c for c in df.columns}
+        colonne = colonnes_par_minuscule.get(colonne.lower())
+        if colonne is None:
+            return None
 
     if agregation == "sum":
         return df[colonne].sum()

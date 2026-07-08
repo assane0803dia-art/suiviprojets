@@ -2,10 +2,11 @@ import streamlit as st
 import os
 from auth import require_login, logout_button
 import auth
-from ui_style import sidebar_brand, section_title, badge_html, tip
+from ui_style import sidebar_brand, section_title, badge_html, tip, ai_text_toolbar
 import ui_style
 import crud
 import validators
+import ai_text_assist
 
 st.set_page_config(page_title="Mes projets - SuiviProjets", page_icon="📂", layout="wide")
 require_login()
@@ -436,24 +437,56 @@ else:
         else:
             with st.expander("➕ Ajouter un résultat attendu"):
                 obj_options = {row["id"]: row["titre"] for _, row in objectifs_df.iterrows()}
-                with st.form("form_new_resultat", clear_on_submit=True):
-                    objectif_id = st.selectbox("Objectif concerné *", options=list(obj_options.keys()), format_func=lambda x: obj_options[x])
-                    titre_r = st.text_input("Titre *")
-                    description_r = st.text_area("Description")
-                    c1, c2, c3 = st.columns(3)
-                    indicateur = c1.text_input("Indicateur")
-                    valeur_cible = c2.number_input("Valeur cible")
-                    valeur_actuelle = c3.number_input("Valeur actuelle")
-                    c4, c5 = st.columns(2)
-                    unite = c4.text_input("Unité")
-                    statut_r = c5.selectbox("Statut", crud.STATUTS_GENERIQUE)
-                    if st.form_submit_button("Ajouter"):
-                        if not titre_r:
-                            st.warning("Le titre est obligatoire.")
-                        else:
-                            crud.create_resultat(objectif_id, titre_r, description_r, indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
-                            st.success("✅ Résultat ajouté avec succès.")
-                            st.rerun()
+                objectif_id = st.selectbox("Objectif concerné *", options=list(obj_options.keys()), format_func=lambda x: obj_options[x], key="new_res_objectif")
+
+                titre_r = st.text_input("Titre *", key="new_res_titre")
+                description_r = st.text_area("Description", key="new_res_description")
+                ai_text_toolbar("new_res_description", contexte=f"Projet : {projet_row['description'] or ''} | Objectif : {obj_options.get(objectif_id, '')}")
+
+                if st.button("✨ Suggérer des résultats avec l'IA", key="suggest_res_btn"):
+                    try:
+                        with st.spinner("L'IA réfléchit..."):
+                            suggestions = ai_text_assist.suggest_items(
+                                "resultats", projet_row["description"] or "", obj_options.get(objectif_id, ""),
+                            )
+                        st.session_state["res_suggestions"] = suggestions
+                    except RuntimeError as e:
+                        st.error(str(e))
+                    except Exception as e:
+                        st.error(f"Erreur IA : {e}")
+
+                if st.session_state.get("res_suggestions"):
+                    st.caption("Suggestions de l'IA — cliquez sur ➕ pour ajouter directement :")
+                    for i, sugg in enumerate(st.session_state["res_suggestions"]):
+                        c1, c2 = st.columns([5, 1])
+                        with c1:
+                            st.write(f"**{sugg.get('titre', '')}** — {sugg.get('indicateur', '')} ({sugg.get('unite', '')})")
+                            st.caption(sugg.get("description", ""))
+                        with c2:
+                            if st.button("➕ Ajouter", key=f"add_suggestion_res_{i}", use_container_width=True):
+                                crud.create_resultat(
+                                    objectif_id, sugg.get("titre", ""), sugg.get("description", ""),
+                                    sugg.get("indicateur", ""), 0, 0, sugg.get("unite", ""), "À faire",
+                                )
+                                st.success("✅ Résultat ajouté avec succès.")
+                                st.rerun()
+
+                c1, c2, c3 = st.columns(3)
+                indicateur = c1.text_input("Indicateur", key="new_res_indicateur")
+                valeur_cible = c2.number_input("Valeur cible", key="new_res_cible")
+                valeur_actuelle = c3.number_input("Valeur actuelle", key="new_res_actuelle")
+                c4, c5 = st.columns(2)
+                unite = c4.text_input("Unité", key="new_res_unite")
+                statut_r = c5.selectbox("Statut", crud.STATUTS_GENERIQUE, key="new_res_statut")
+                if st.button("Ajouter", key="submit_new_resultat"):
+                    if not titre_r:
+                        st.warning("Le titre est obligatoire.")
+                    else:
+                        crud.create_resultat(objectif_id, titre_r, description_r, indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
+                        for k in ["new_res_titre", "new_res_description", "new_res_indicateur", "new_res_unite", "res_suggestions"]:
+                            st.session_state.pop(k, None)
+                        st.success("✅ Résultat ajouté avec succès.")
+                        st.rerun()
 
             if resultats_df.empty:
                 st.info("Aucun résultat attendu pour ce projet.")
@@ -470,9 +503,15 @@ else:
                 selected_res_id = st.selectbox("Modifier un résultat", options=list(res_options.keys()), format_func=lambda x: res_options[x])
                 res = resultats_df[resultats_df["id"] == selected_res_id].iloc[0]
 
+                edit_key = f"edit_res_description_{res['id']}"
+                if edit_key not in st.session_state:
+                    st.session_state[edit_key] = res["description"] or ""
+
+                titre_r = st.text_input("Titre *", value=res["titre"], key=f"edit_res_titre_{res['id']}")
+                description_r = st.text_area("Description", key=edit_key)
+                ai_text_toolbar(edit_key, contexte=f"Résultat : {res['titre']} | Indicateur : {res['indicateur'] or ''}")
+
                 with st.form(f"form_edit_res_{res['id']}"):
-                    titre_r = st.text_input("Titre *", value=res["titre"])
-                    description_r = st.text_area("Description", value=res["description"] or "")
                     c1, c2, c3 = st.columns(3)
                     indicateur = c1.text_input("Indicateur", value=res["indicateur"] or "")
                     valeur_cible = c2.number_input("Valeur cible", value=float(res["valeur_cible"] or 0))
@@ -485,7 +524,7 @@ else:
                     )
                     col_save, col_delete = st.columns(2)
                     if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                        crud.update_resultat(res["id"], titre_r, description_r, indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
+                        crud.update_resultat(res["id"], titre_r, st.session_state[edit_key], indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
                         st.success("✅ Résultat mis à jour avec succès.")
                         st.rerun()
                     if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
@@ -506,8 +545,37 @@ else:
         else:
             with st.expander("➕ Ajouter une activité"):
                 res_options = {row["id"]: f"{row['titre']} ({row['objectif_titre']})" for _, row in resultats_df.iterrows()}
+                resultat_id = st.selectbox("Résultat concerné *", options=list(res_options.keys()), format_func=lambda x: res_options[x], key="new_act_resultat")
+
+                if st.button("✨ Suggérer des activités avec l'IA", key="suggest_act_btn"):
+                    try:
+                        with st.spinner("L'IA réfléchit..."):
+                            suggestions = ai_text_assist.suggest_items(
+                                "activites", projet_row["description"] or "", res_options.get(resultat_id, ""),
+                            )
+                        st.session_state["act_suggestions"] = suggestions
+                    except RuntimeError as e:
+                        st.error(str(e))
+                    except Exception as e:
+                        st.error(f"Erreur IA : {e}")
+
+                if st.session_state.get("act_suggestions"):
+                    st.caption("Suggestions de l'IA — cliquez sur ➕ pour ajouter directement :")
+                    for i, sugg in enumerate(st.session_state["act_suggestions"]):
+                        c1, c2 = st.columns([5, 1])
+                        with c1:
+                            st.write(f"**{sugg.get('titre', '')}**")
+                            st.caption(sugg.get("description", ""))
+                        with c2:
+                            if st.button("➕ Ajouter", key=f"add_suggestion_act_{i}", use_container_width=True):
+                                crud.create_activite(
+                                    resultat_id, sugg.get("titre", ""), sugg.get("description", ""),
+                                    None, None, None, "À faire", 0, 0,
+                                )
+                                st.success("✅ Activité ajoutée avec succès.")
+                                st.rerun()
+
                 with st.form("form_new_activite", clear_on_submit=True):
-                    resultat_id = st.selectbox("Résultat concerné *", options=list(res_options.keys()), format_func=lambda x: res_options[x])
                     titre_a = st.text_input("Titre *")
                     description_a = st.text_area("Description")
                     c1, c2 = st.columns(2)
@@ -526,6 +594,7 @@ else:
                             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
                         else:
                             crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
+                            st.session_state.pop("act_suggestions", None)
                             st.success("✅ Activité ajoutée avec succès.")
                             st.rerun()
 

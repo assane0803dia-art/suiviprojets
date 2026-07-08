@@ -100,6 +100,35 @@ def tip(key, text):
             st.rerun()
 
 
+def ai_text_toolbar(key, contexte=""):
+    """
+    Barre d'outils IA (Améliorer / Pro / Résumer / Développer) pour un champ de texte.
+    Doit être appelée juste après le widget (st.text_area/text_input) identifié par `key`,
+    et EN DEHORS de tout st.form (les boutons normaux n'interagissent pas dans un formulaire).
+    """
+    import ai_text_assist
+
+    cols = st.columns(4)
+    boutons = [
+        ("✨ Améliorer", "ameliorer"),
+        ("📝 Pro", "professionnel"),
+        ("✂️ Résumer", "resumer"),
+        ("➕ Développer", "developper"),
+    ]
+    for col, (label, mode) in zip(cols, boutons):
+        with col:
+            if st.button(label, key=f"{key}_btn_{mode}", use_container_width=True):
+                try:
+                    with st.spinner("L'IA travaille..."):
+                        nouveau_texte = ai_text_assist.rewrite_text(st.session_state.get(key, ""), mode, contexte)
+                    st.session_state[key] = nouveau_texte
+                    st.rerun()
+                except RuntimeError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    st.error(f"Erreur IA : {e}")
+
+
 def sidebar_brand():
     with st.sidebar:
         st.markdown(

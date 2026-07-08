@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import require_login, logout_button
-from ui_style import sidebar_brand, section_title, tip
+from ui_style import sidebar_brand, section_title, tip, ai_text_toolbar
 import crud
 import validators
 
@@ -16,10 +16,12 @@ st.divider()
 section_title("📌", "Informations de base")
 tip("nouveau_projet_contexte", "Décrivez brièvement le problème auquel votre projet répond — cette description sert de base au Contexte du rapport IA.")
 
-with st.form("form_new_projet_quick", clear_on_submit=True):
-    nom = st.text_input("Nom du projet *")
-    description = st.text_area("Description")
+# En dehors du formulaire pour permettre les boutons d'assistance IA
+nom = st.text_input("Nom du projet *", key="new_projet_nom")
+description = st.text_area("Description", key="new_projet_description")
+ai_text_toolbar("new_projet_description", contexte=f"Nom du projet : {nom}" if nom else "")
 
+with st.form("form_new_projet_quick"):
     with st.expander("➕ Informations complémentaires (facultatif — modifiable plus tard)"):
         c1, c2 = st.columns(2)
         date_debut = c1.date_input("Date de début", value=None)
@@ -45,6 +47,8 @@ with st.form("form_new_projet_quick", clear_on_submit=True):
             try:
                 new_id = crud.create_projet(nom, description, date_debut, date_fin, budget, statut, responsable_id)
                 st.session_state["jump_to_projet_id"] = new_id
+                st.session_state.pop("new_projet_nom", None)
+                st.session_state.pop("new_projet_description", None)
                 st.success(f"✅ Projet « {nom} » créé avec succès.")
                 st.switch_page("pages/2_📂_Mes_Projets.py")
             except ValueError as e:

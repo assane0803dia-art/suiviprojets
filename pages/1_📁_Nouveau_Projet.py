@@ -49,7 +49,7 @@ with st.form("form_new_projet_quick"):
                 st.session_state["jump_to_projet_id"] = new_id
                 st.session_state.pop("new_projet_nom", None)
                 st.session_state.pop("new_projet_description", None)
-                st.success(f"✅ Projet « {nom} » créé avec succès.")
+                st.toast(f"✅ Projet « {nom} » créé avec succès.")
                 st.switch_page("pages/2_📂_Mes_Projets.py")
             except ValueError as e:
                 st.error(str(e))

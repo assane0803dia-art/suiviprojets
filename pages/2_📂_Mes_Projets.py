@@ -173,7 +173,7 @@ if not is_lecteur:
                             selected_projet_id, nom_edit, description_edit, date_debut_edit, date_fin_edit,
                             float(projet_row["budget"] or 0), statut_edit, responsable_id_edit,
                         )
-                        st.success("✅ Projet mis à jour avec succès.")
+                        st.toast("✅ Projet mis à jour avec succès.")
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
@@ -380,7 +380,7 @@ else:
                         st.warning("Le titre est obligatoire.")
                     else:
                         crud.create_objectif(selected_projet_id, type_objectif_new, titre, responsable_id)
-                        st.success("✅ Objectif ajouté avec succès.")
+                        st.toast("✅ Objectif ajouté avec succès.")
                         st.rerun()
 
         if objectifs_df.empty:
@@ -416,7 +416,7 @@ else:
                 col_save, col_delete = st.columns(2)
                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
                     crud.update_objectif(obj["id"], type_objectif_edit, titre, responsable_id)
-                    st.success("✅ Objectif mis à jour avec succès.")
+                    st.toast("✅ Objectif mis à jour avec succès.")
                     st.rerun()
                 if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                     crud.delete_objectif(obj["id"])
@@ -468,7 +468,7 @@ else:
                                     objectif_id, sugg.get("titre", ""), sugg.get("description", ""),
                                     sugg.get("indicateur", ""), 0, 0, sugg.get("unite", ""), "À faire",
                                 )
-                                st.success("✅ Résultat ajouté avec succès.")
+                                st.toast("✅ Résultat ajouté avec succès.")
                                 st.rerun()
 
                 c1, c2, c3 = st.columns(3)
@@ -485,7 +485,7 @@ else:
                         crud.create_resultat(objectif_id, titre_r, description_r, indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
                         for k in ["new_res_titre", "new_res_description", "new_res_indicateur", "new_res_unite", "res_suggestions"]:
                             st.session_state.pop(k, None)
-                        st.success("✅ Résultat ajouté avec succès.")
+                        st.toast("✅ Résultat ajouté avec succès.")
                         st.rerun()
 
             if resultats_df.empty:
@@ -525,7 +525,7 @@ else:
                     col_save, col_delete = st.columns(2)
                     if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
                         crud.update_resultat(res["id"], titre_r, st.session_state[edit_key], indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
-                        st.success("✅ Résultat mis à jour avec succès.")
+                        st.toast("✅ Résultat mis à jour avec succès.")
                         st.rerun()
                     if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                         crud.delete_resultat(res["id"])
@@ -572,7 +572,7 @@ else:
                                     resultat_id, sugg.get("titre", ""), sugg.get("description", ""),
                                     None, None, None, "À faire", 0, 0,
                                 )
-                                st.success("✅ Activité ajoutée avec succès.")
+                                st.toast("✅ Activité ajoutée avec succès.")
                                 st.rerun()
 
                 with st.form("form_new_activite", clear_on_submit=True):
@@ -595,7 +595,7 @@ else:
                         else:
                             crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
                             st.session_state.pop("act_suggestions", None)
-                            st.success("✅ Activité ajoutée avec succès.")
+                            st.toast("✅ Activité ajoutée avec succès.")
                             st.rerun()
 
             if activites_df.empty:
@@ -638,7 +638,7 @@ else:
                             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
                         else:
                             crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
-                            st.success("✅ Activité mise à jour avec succès.")
+                            st.toast("✅ Activité mise à jour avec succès.")
                             st.rerun()
                     if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                         crud.delete_activite(act["id"])
@@ -684,7 +684,7 @@ else:
                             )
                         else:
                             crud.create_tache(activite_id, titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
-                            st.success("✅ Tâche ajoutée avec succès.")
+                            st.toast("✅ Tâche ajoutée avec succès.")
                             st.rerun()
 
             if taches_df.empty:
@@ -736,7 +736,7 @@ else:
                             )
                         else:
                             crud.update_tache(tache["id"], titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
-                            st.success("✅ Tâche mise à jour avec succès.")
+                            st.toast("✅ Tâche mise à jour avec succès.")
                             st.rerun()
                     if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                         crud.delete_tache(tache["id"])
@@ -776,7 +776,7 @@ else:
                         )
                         if st.button("Mettre à jour", key=f"indic_update_{row['id']}", use_container_width=True):
                             crud.update_resultat_valeur_actuelle(row["id"], new_val)
-                            st.success("✅ Indicateur mis à jour avec succès.")
+                            st.toast("✅ Indicateur mis à jour avec succès.")
                             st.rerun()
 
     # ==============================================================================
@@ -805,7 +805,7 @@ else:
                         projet_row["date_debut"], projet_row["date_fin"], nouveau_budget,
                         projet_row["statut"], projet_row["responsable_id"],
                     )
-                    st.success("✅ Budget mis à jour avec succès.")
+                    st.toast("✅ Budget mis à jour avec succès.")
                     st.rerun()
 
         if not activites_df.empty:
@@ -837,7 +837,7 @@ else:
                         st.warning("Le nom est obligatoire.")
                     else:
                         crud.create_partie_prenante(selected_projet_id, nom_p, type_p, role_p, contact_p)
-                        st.success("✅ Partie prenante ajoutée avec succès.")
+                        st.toast("✅ Partie prenante ajoutée avec succès.")
                         st.rerun()
 
         if parties_prenantes_df.empty:
@@ -866,7 +866,7 @@ else:
                 col_save, col_delete = st.columns(2)
                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
                     crud.update_partie_prenante(partie["id"], nom_p, type_p, role_p, contact_p)
-                    st.success("✅ Partie prenante mise à jour avec succès.")
+                    st.toast("✅ Partie prenante mise à jour avec succès.")
                     st.rerun()
                 if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                     crud.delete_partie_prenante(partie["id"])
@@ -896,7 +896,7 @@ else:
                         with open(chemin, "wb") as f:
                             f.write(fichier.getbuffer())
                         crud.create_document(selected_projet_id, fichier.name, chemin, type_doc, description_doc)
-                        st.success("✅ Document ajouté avec succès.")
+                        st.toast("✅ Document ajouté avec succès.")
                         st.rerun()
 
         if documents_df.empty:

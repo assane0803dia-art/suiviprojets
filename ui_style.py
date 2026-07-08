@@ -24,9 +24,13 @@ def inject_global_style():
     st.markdown(
         f"""
         <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+            html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
+
             .main {{ background-color: {BG}; }}
 
-            h1, h2, h3 {{ color: {TEXT}; font-weight: 800; }}
+            h1, h2, h3 {{ color: {TEXT}; font-weight: 800; letter-spacing: -0.01em; }}
 
             .app-card {{
                 background-color: {CARD_BG};
@@ -35,7 +39,9 @@ def inject_global_style():
                 box-shadow: 0 1px 3px rgba(0,0,0,0.06);
                 border: 1px solid {BORDER};
                 margin-bottom: 10px;
+                transition: box-shadow 0.15s ease, transform 0.15s ease;
             }}
+            .app-card:hover {{ box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
 
             .kpi-card {{
                 background-color: {CARD_BG};
@@ -44,7 +50,9 @@ def inject_global_style():
                 box-shadow: 0 1px 3px rgba(0,0,0,0.06);
                 border-left: 5px solid {PRIMARY};
                 margin-bottom: 8px;
+                transition: box-shadow 0.15s ease;
             }}
+            .kpi-card:hover {{ box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
             .kpi-label {{
                 font-size: 0.8rem; color: {MUTED}; font-weight: 600;
                 text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
@@ -59,6 +67,7 @@ def inject_global_style():
             .step-pill {{
                 display: inline-block; padding: 4px 14px; border-radius: 999px;
                 font-size: 0.8rem; font-weight: 600; margin-right: 6px; margin-bottom: 10px;
+                transition: transform 0.15s ease;
             }}
             .step-done {{ background-color: #DCFCE7; color: {SUCCESS}; }}
             .step-active {{ background-color: #E0E7FF; color: {PRIMARY}; }}
@@ -74,7 +83,17 @@ def inject_global_style():
 
             div.stButton > button, div.stFormSubmitButton > button {{
                 border-radius: 10px; font-weight: 600;
+                transition: transform 0.1s ease, box-shadow 0.15s ease;
             }}
+            div.stButton > button:hover, div.stFormSubmitButton > button:hover {{
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            }}
+            div.stButton > button:active, div.stFormSubmitButton > button:active {{
+                transform: translateY(0px);
+            }}
+
+            [data-testid="stContainer"] {{ transition: box-shadow 0.15s ease; }}
 
             [data-testid="stSidebar"] .stCaption {{ color: {MUTED}; }}
         </style>

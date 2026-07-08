@@ -661,6 +661,34 @@ else:
                 activite_id = st.selectbox("Activité concernée *", options=list(act_options.keys()), format_func=lambda x: act_options[x], key="new_tache_activite")
                 act_row = activites_df[activites_df["id"] == activite_id].iloc[0]
 
+                if st.button("✨ Suggérer des tâches avec l'IA", key="suggest_tache_btn"):
+                    try:
+                        with st.spinner("L'IA réfléchit..."):
+                            suggestions = ai_text_assist.suggest_items(
+                                "taches", projet_row["description"] or "", act_row["titre"],
+                            )
+                        st.session_state["tache_suggestions"] = suggestions
+                    except RuntimeError as e:
+                        st.error(str(e))
+                    except Exception as e:
+                        st.error(f"Erreur IA : {e}")
+
+                if st.session_state.get("tache_suggestions"):
+                    st.caption("Suggestions de l'IA — cliquez sur ➕ pour ajouter directement :")
+                    for i, sugg in enumerate(st.session_state["tache_suggestions"]):
+                        c1, c2 = st.columns([5, 1])
+                        with c1:
+                            st.write(f"**{sugg.get('titre', '')}**")
+                            st.caption(sugg.get("description", ""))
+                        with c2:
+                            if st.button("➕ Ajouter", key=f"add_suggestion_tache_{i}", use_container_width=True):
+                                crud.create_tache(
+                                    activite_id, sugg.get("titre", ""), sugg.get("description", ""),
+                                    None, "Moyenne", "À faire", None, None, 0,
+                                )
+                                st.toast("✅ Tâche ajoutée avec succès.")
+                                st.rerun()
+
                 titre_t = st.text_input("Titre *", key="new_tache_titre")
                 description_t = st.text_area("Description", key="new_tache_description")
                 c1, c2 = st.columns(2)
@@ -687,7 +715,7 @@ else:
                         )
                     else:
                         crud.create_tache(activite_id, titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
-                        for k in ["new_tache_titre", "new_tache_description", "new_tache_debut", "new_tache_fin", "new_tache_progression"]:
+                        for k in ["new_tache_titre", "new_tache_description", "new_tache_debut", "new_tache_fin", "new_tache_progression", "tache_suggestions"]:
                             st.session_state.pop(k, None)
                         st.toast("✅ Tâche ajoutée avec succès.")
                         st.rerun()

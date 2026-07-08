@@ -658,34 +658,39 @@ else:
         else:
             with st.expander("➕ Ajouter une tâche"):
                 act_options = {row["id"]: f"{row['titre']} ({row['resultat_titre']})" for _, row in activites_df.iterrows()}
-                with st.form("form_new_tache", clear_on_submit=True):
-                    activite_id = st.selectbox("Activité concernée *", options=list(act_options.keys()), format_func=lambda x: act_options[x])
-                    titre_t = st.text_input("Titre *")
-                    description_t = st.text_area("Description")
-                    c1, c2 = st.columns(2)
-                    priorite_t = c1.selectbox("Priorité", crud.PRIORITES_TACHE)
-                    statut_t = c2.selectbox("Statut", crud.STATUTS_GENERIQUE)
-                    c3, c4 = st.columns(2)
-                    date_debut_t = c3.date_input("Date de début", value=None)
-                    date_fin_t = c4.date_input("Date de fin", value=None)
-                    progression_t = st.slider("Progression (%)", 0, 100, 0)
-                    resp_options = responsable_options()
-                    responsable_id_t = st.selectbox("Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x])
-                    if st.form_submit_button("Ajouter"):
-                        act_row = activites_df[activites_df["id"] == activite_id].iloc[0]
-                        if not titre_t:
-                            st.warning("Le titre est obligatoire.")
-                        elif not validators.dates_valides(date_debut_t, date_fin_t):
-                            st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
-                        elif not validators.tache_dans_intervalle_activite(date_debut_t, date_fin_t, act_row["date_debut"], act_row["date_fin"]):
-                            st.warning(
-                                f"⚠️ Les dates de la tâche doivent rester dans la période de l'activité "
-                                f"« {act_row['titre']} » ({act_row['date_debut']} → {act_row['date_fin']})."
-                            )
-                        else:
-                            crud.create_tache(activite_id, titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
-                            st.toast("✅ Tâche ajoutée avec succès.")
-                            st.rerun()
+                activite_id = st.selectbox("Activité concernée *", options=list(act_options.keys()), format_func=lambda x: act_options[x], key="new_tache_activite")
+                act_row = activites_df[activites_df["id"] == activite_id].iloc[0]
+
+                titre_t = st.text_input("Titre *", key="new_tache_titre")
+                description_t = st.text_area("Description", key="new_tache_description")
+                c1, c2 = st.columns(2)
+                priorite_t = c1.selectbox("Priorité", crud.PRIORITES_TACHE, key="new_tache_priorite")
+                statut_t = c2.selectbox("Statut", crud.STATUTS_GENERIQUE, key="new_tache_statut")
+                c3, c4 = st.columns(2)
+                date_debut_t = c3.date_input("Date de début", value=None, key="new_tache_debut")
+                date_fin_t = c4.date_input("Date de fin", value=None, key="new_tache_fin")
+                st.caption(f"📅 Période de l'activité « {act_row['titre']} » : {act_row['date_debut'] or 'non définie'} → {act_row['date_fin'] or 'non définie'}")
+                progression_t = st.slider("Progression (%)", 0, 100, 0, key="new_tache_progression")
+                resp_options = responsable_options()
+                responsable_id_t = st.selectbox("Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x], key="new_tache_responsable")
+
+                if st.button("Ajouter", key="submit_new_tache"):
+                    if not titre_t:
+                        st.warning("Le titre est obligatoire.")
+                    elif not validators.dates_valides(date_debut_t, date_fin_t):
+                        st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début. Corrigez les dates ci-dessus et réessayez.")
+                    elif not validators.tache_dans_intervalle_activite(date_debut_t, date_fin_t, act_row["date_debut"], act_row["date_fin"]):
+                        st.warning(
+                            f"⚠️ Les dates de la tâche doivent rester dans la période de l'activité "
+                            f"« {act_row['titre']} » ({act_row['date_debut']} → {act_row['date_fin']}). "
+                            "Corrigez les dates ci-dessus et réessayez — le reste de vos informations est conservé."
+                        )
+                    else:
+                        crud.create_tache(activite_id, titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
+                        for k in ["new_tache_titre", "new_tache_description", "new_tache_debut", "new_tache_fin", "new_tache_progression"]:
+                            st.session_state.pop(k, None)
+                        st.toast("✅ Tâche ajoutée avec succès.")
+                        st.rerun()
 
             if taches_df.empty:
                 st.info("Aucune tâche pour ce projet.")
@@ -717,6 +722,8 @@ else:
                     c3, c4 = st.columns(2)
                     date_debut_t = c3.date_input("Date de début", value=tache["date_debut"])
                     date_fin_t = c4.date_input("Date de fin", value=tache["date_fin"])
+                    _act_row_for_caption = activites_df[activites_df["id"] == tache["activite_id"]].iloc[0]
+                    st.caption(f"📅 Période de l'activité « {_act_row_for_caption['titre']} » : {_act_row_for_caption['date_debut'] or 'non définie'} → {_act_row_for_caption['date_fin'] or 'non définie'}")
                     progression_t = st.slider("Progression (%)", 0, 100, int(tache["progression"] or 0))
                     resp_options = responsable_options()
                     current_resp = tache["responsable_id"] if tache["responsable_id"] in resp_options else None
@@ -732,7 +739,8 @@ else:
                         elif not validators.tache_dans_intervalle_activite(date_debut_t, date_fin_t, act_row["date_debut"], act_row["date_fin"]):
                             st.warning(
                                 f"⚠️ Les dates de la tâche doivent rester dans la période de l'activité "
-                                f"« {act_row['titre']} » ({act_row['date_debut']} → {act_row['date_fin']})."
+                                f"« {act_row['titre']} » ({act_row['date_debut']} → {act_row['date_fin']}). "
+                                "Corrigez les dates ci-dessus et réessayez — le reste de vos informations est conservé."
                             )
                         else:
                             crud.update_tache(tache["id"], titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
@@ -923,4 +931,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

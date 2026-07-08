@@ -8,7 +8,7 @@ from indicators_config import (
     compute_kpi_value,
     format_kpi_value,
 )
-from db import get_connection
+import db
 
 st.set_page_config(page_title="Tableau de bord - SuiviProjets", page_icon="📊", layout="wide")
 
@@ -19,8 +19,7 @@ logout_button()
 
 @st.cache_data(ttl=300)
 def load_data():
-    conn = get_connection()
-    return pd.read_sql("SELECT * FROM V_Dashboard_Projets", conn)
+    return db.run_query("SELECT * FROM V_Dashboard_Projets")
 
 
 try:

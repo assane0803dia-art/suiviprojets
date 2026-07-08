@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import streamlit as st
-from db import get_connection
+import db
 
 
 def _to_native(value):
@@ -22,52 +22,32 @@ def _convert_params(params):
 
 
 def run_query(query, params=None):
-    conn = get_connection()
-    df = pd.read_sql(query, conn, params=_convert_params(params))
-    conn.close()
-    return df
+    """Exécute une requête SELECT via le pool de connexions partagé."""
+    return db.run_query(query, params=_convert_params(params))
 
 
 def run_execute(query, params=None):
-    """
-    Exécute une requête. Si la requête est un INSERT se terminant par
-    "RETURNING id", retourne cet identifiant (motif standard PostgreSQL).
-    """
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        params = _convert_params(params)
-        if params:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-
-        new_id = None
-        if cursor.description:  # une clause RETURNING produit un résultat
-            row = cursor.fetchone()
-            if row:
-                new_id = row[0]
-
-        conn.commit()
-        return new_id
-    finally:
-        conn.close()
+    """Exécute une requête d'écriture via le pool de connexions partagé."""
+    return db.run_execute(query, params=_convert_params(params))
 
 
 # ----------------------------------------------------------------------------
 # Utilisateurs (responsables)
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=30)
 def get_utilisateurs():
     return run_query("SELECT id, nom, email, role FROM Utilisateurs ORDER BY nom")
 
 
 def create_utilisateur(nom, email, role):
     try:
-        return run_execute(
+        new_id = run_execute(
             "INSERT INTO Utilisateurs (nom, email, mot_de_passe, role, date_creation) "
             "VALUES (%s, %s, '', %s, NOW()) RETURNING id",
             (nom, email, role),
         )
+        get_utilisateurs.clear()
+        return new_id
     except psycopg2.errors.UniqueViolation:
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
 

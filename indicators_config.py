@@ -1,18 +1,12 @@
 import pandas as pd
 import streamlit as st
-from db import get_connection
+import db
 
 
 @st.cache_data(ttl=60)
 def load_all_indicators() -> pd.DataFrame:
     """Charge toute la configuration (utilisé sur la page Paramètres)."""
-    conn = get_connection()
-    df = pd.read_sql(
-        "SELECT * FROM Dashboard_Indicateurs ORDER BY type_element, ordre",
-        conn,
-    )
-    conn.close()
-    return df
+    return db.run_query("SELECT * FROM Dashboard_Indicateurs ORDER BY type_element, ordre")
 
 
 def load_visible_indicators() -> pd.DataFrame:
@@ -22,14 +16,10 @@ def load_visible_indicators() -> pd.DataFrame:
 
 
 def update_indicator(indicateur_id: int, visible: bool, ordre: int):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
+    db.run_execute(
         "UPDATE Dashboard_Indicateurs SET visible = %s, ordre = %s WHERE id = %s",
         (bool(visible), ordre, indicateur_id),
     )
-    conn.commit()
-    conn.close()
 
 
 def compute_kpi_value(row: pd.Series, df: pd.DataFrame):

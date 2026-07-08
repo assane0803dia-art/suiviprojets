@@ -1,5 +1,6 @@
 import streamlit as st
 import bcrypt
+import pandas as pd
 from ui_style import inject_global_style
 import db
 
@@ -96,6 +97,46 @@ def delete_own_account(user_id):
     db.run_execute("DELETE FROM Users WHERE id = %s", (user_id,))
 
 
+def get_last_project(user_id):
+    df = db.run_query("SELECT dernier_projet_id FROM Users WHERE id = %s", params=(user_id,))
+    if df.empty or pd.isna(df.iloc[0]["dernier_projet_id"]):
+        return None
+    return int(df.iloc[0]["dernier_projet_id"])
+
+
+def update_last_project(user_id, projet_id):
+    db.run_execute("UPDATE Users SET dernier_projet_id = %s WHERE id = %s", (projet_id, user_id))
+
+
+def _redirect_after_login(user):
+    """
+    Envoie l'utilisateur directement dans son espace de travail après connexion :
+    - vers la création de projet s'il n'en a aucun (ou aucun accès, pour un lecteur)
+    - vers son dernier projet consulté sinon, avec la première section déjà ouverte
+    """
+    import crud  # import local pour éviter tout risque de dépendance circulaire
+
+    if user["role"] == "lecteur":
+        projets_df = crud.get_projets_accessibles(user["id"])
+    else:
+        projets_df = crud.get_projets()
+
+    if projets_df.empty:
+        if user["role"] == "lecteur":
+            st.switch_page("pages/2_📂_Mes_Projets.py")
+        else:
+            st.switch_page("pages/1_📁_Nouveau_Projet.py")
+        return
+
+    dernier_id = get_last_project(user["id"])
+    ids_disponibles = projets_df["id"].tolist()
+    target_id = dernier_id if dernier_id in ids_disponibles else ids_disponibles[0]
+
+    st.session_state["jump_to_projet_id"] = target_id
+    st.session_state["hub_active_section"] = "objectifs"
+    st.switch_page("pages/2_📂_Mes_Projets.py")
+
+
 def login_form():
     """Affiche le formulaire de connexion. Retourne True si l'utilisateur est connecté."""
     if st.session_state.get("authenticated"):
@@ -125,7 +166,7 @@ def login_form():
                         st.session_state["authenticated"] = True
                         st.session_state["user"] = user
                         _log_connexion(user["id"])
-                        st.rerun()
+                        _redirect_after_login(user)
                     else:
                         st.error("Nom d'utilisateur ou mot de passe incorrect.")
 

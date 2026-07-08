@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from auth import require_login, logout_button
+import auth
 from ui_style import sidebar_brand, section_title, badge_html, tip
 import ui_style
 import crud
@@ -54,10 +55,14 @@ selected_projet_id = st.selectbox(
 
 projet_row = projets_df[projets_df["id"] == selected_projet_id].iloc[0]
 
-# Réinitialise la section active si on change de projet
-if st.session_state.get("hub_last_projet_id") != selected_projet_id:
+# Réinitialise la section active seulement si l'utilisateur change réellement de projet
+# (ne pas écraser la section déjà ouverte par la redirection post-connexion)
+if "hub_last_projet_id" in st.session_state and st.session_state["hub_last_projet_id"] != selected_projet_id:
     st.session_state["hub_active_section"] = None
+
+if st.session_state.get("hub_last_projet_id") != selected_projet_id:
     st.session_state["hub_last_projet_id"] = selected_projet_id
+    auth.update_last_project(current_user["id"], selected_projet_id)
 
 if "hub_active_section" not in st.session_state:
     st.session_state["hub_active_section"] = None

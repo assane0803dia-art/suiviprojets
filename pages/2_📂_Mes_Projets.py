@@ -8,7 +8,6 @@ import crud
 import validators
 import ai_text_assist
 
-st.set_page_config(page_title="Mes projets - SuiviProjets", page_icon="📂", layout="wide")
 require_login()
 sidebar_brand()
 logout_button()
@@ -959,3 +958,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

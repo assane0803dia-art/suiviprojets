@@ -6,7 +6,6 @@ import crud
 import ai_report_generator as ai
 import report_export
 
-st.set_page_config(page_title="Rapports - SuiviProjets", page_icon="📊", layout="wide")
 require_login()
 sidebar_brand()
 logout_button()
@@ -75,7 +74,7 @@ if generer or regenerer:
                 snapshot = ai.build_project_snapshot(selected_projet_id, projet_row, crud)
                 report_text = ai.generate_execution_report(snapshot, model=modele_prefere)
                 st.session_state["rapport_draft"] = report_text
-                st.success("✅ Rapport généré avec succès. Vous pouvez le modifier ci-dessous avant de l'enregistrer.")
+                st.toast("✅ Rapport généré avec succès. Vous pouvez le modifier ci-dessous avant de l'enregistrer.")
             except RuntimeError as e:
                 st.error(str(e))
             except Exception as e:
@@ -98,7 +97,7 @@ if "rapport_draft" in st.session_state:
         titre_rapport = st.text_input("Titre du rapport à sauvegarder", value=f"Rapport — {projet_row['nom']} — {datetime.now().strftime('%d/%m/%Y')}")
         if st.button("💾 Sauvegarder dans le projet", use_container_width=True):
             crud.create_rapport(selected_projet_id, titre_rapport, rapport_edite, user["id"])
-            st.success("✅ Rapport sauvegardé avec succès.")
+            st.toast("✅ Rapport sauvegardé avec succès.")
             st.rerun()
 
     with col2:

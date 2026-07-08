@@ -10,7 +10,6 @@ from ui_style import sidebar_brand, section_title, badge_html, tip
 from indicators_config import load_all_indicators, update_indicator
 import crud
 
-st.set_page_config(page_title="Paramètres - SuiviProjets", page_icon="⚙️", layout="wide")
 require_login()
 sidebar_brand()
 logout_button()
@@ -67,7 +66,7 @@ with tabs[0]:
                     with open(photo_path, "wb") as f:
                         f.write(nouvelle_photo.getbuffer())
                 update_profile(user["id"], nom_complet, email, photo_path)
-                st.success("✅ Profil mis à jour avec succès.")
+                st.toast("✅ Profil mis à jour avec succès.")
                 st.rerun()
 
 # ==============================================================================
@@ -91,7 +90,7 @@ with tabs[1]:
         )
         if st.form_submit_button("💾 Enregistrer", use_container_width=True):
             update_preferences_projet(user["id"], langue, fuseau, modele_rapport)
-            st.success("✅ Préférences mises à jour avec succès.")
+            st.toast("✅ Préférences mises à jour avec succès.")
             st.rerun()
 
     st.caption("ℹ️ L'application est actuellement disponible en français uniquement — le sélecteur de langue est prêt pour une future traduction anglaise.")
@@ -119,7 +118,7 @@ with tabs[2]:
 
         if st.form_submit_button("💾 Enregistrer", use_container_width=True):
             update_preferences_ia(user["id"], ia_modele, ia_creativite, ia_langue, ia_suggestions)
-            st.success("✅ Préférences IA mises à jour avec succès.")
+            st.toast("✅ Préférences IA mises à jour avec succès.")
             st.rerun()
 
 # ==============================================================================
@@ -135,7 +134,7 @@ with tabs[3]:
 
         if st.form_submit_button("💾 Enregistrer", use_container_width=True):
             update_notifications(user["id"], notif_email, notif_app, notif_alertes)
-            st.success("✅ Préférences de notification mises à jour avec succès.")
+            st.toast("✅ Préférences de notification mises à jour avec succès.")
             st.rerun()
 
     st.info(
@@ -262,7 +261,7 @@ if is_admin:
                         for indicateur_id, visible, ordre in updated_rows:
                             update_indicator(indicateur_id, visible, ordre)
                         st.cache_data.clear()
-                        st.success("✅ Configuration enregistrée avec succès.")
+                        st.toast("✅ Configuration enregistrée avec succès.")
                         st.rerun()
             st.write("")
 
@@ -313,5 +312,5 @@ if is_admin:
                 for projet_id in projets_deja_accessibles:
                     if projet_id not in selected_projets:
                         crud.revoke_acces_lecteur(selected_lecteur_id, projet_id)
-                st.success("✅ Accès mis à jour avec succès.")
+                st.toast("✅ Accès mis à jour avec succès.")
                 st.rerun()

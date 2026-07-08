@@ -4,7 +4,6 @@ from ui_style import sidebar_brand, section_title, tip, ai_text_toolbar
 import crud
 import validators
 
-st.set_page_config(page_title="Nouveau projet - SuiviProjets", page_icon="📁", layout="wide")
 require_login()
 sidebar_brand()
 logout_button()

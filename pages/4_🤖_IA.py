@@ -4,7 +4,6 @@ from ui_style import sidebar_brand, section_title, badge_html, tip
 import crud
 import ai_report_generator as ai
 
-st.set_page_config(page_title="IA - SuiviProjets", page_icon="🤖", layout="wide")
 require_login()
 sidebar_brand()
 logout_button()
@@ -45,7 +44,7 @@ c3.metric("Tâches en retard", total_taches_retard)
 st.write("")
 
 if total_activites_retard == 0 and total_taches_retard == 0:
-    st.success("✅ Aucun retard détecté sur l'ensemble de vos projets.")
+    st.toast("✅ Aucun retard détecté sur l'ensemble de vos projets.")
 else:
     for _, projet_row in projets_df.iterrows():
         snapshot, risques = risques_par_projet[projet_row["id"]]

@@ -78,6 +78,7 @@ def responsable_options():
 
 def open_section(key):
     st.session_state["hub_active_section"] = key
+    st.session_state["just_switched_section"] = True
     st.rerun()
 
 
@@ -200,39 +201,56 @@ cards = [
     ("documents", "📄", "Documents", len(documents_df)),
 ]
 
-grid_cols = st.columns(4)
-for i, (key, icon, label, count) in enumerate(cards):
-    with grid_cols[i % 4]:
-        with st.container(border=True):
-            if key in ui_style.SECTION_HELP:
-                col_label, col_info = st.columns([5, 1])
-                with col_label:
-                    st.markdown(f"**{icon} {label}**")
-                with col_info:
-                    with st.popover("ℹ️", use_container_width=True):
-                        st.write(ui_style.SECTION_HELP[key])
-            else:
-                st.markdown(f"**{icon} {label}**")
-            if count is not None:
-                st.caption(f"{count} élément(s) enregistré(s)")
-            else:
-                st.caption("Aperçu rapide")
-            if st.button("Ouvrir", key=f"open_{key}", use_container_width=True):
-                open_section(key)
-
-st.divider()
-
 active = st.session_state["hub_active_section"]
 
 if active is None:
+    grid_cols = st.columns(4)
+    for i, (key, icon, label, count) in enumerate(cards):
+        with grid_cols[i % 4]:
+            with st.container(border=True):
+                if key in ui_style.SECTION_HELP:
+                    col_label, col_info = st.columns([5, 1])
+                    with col_label:
+                        st.markdown(f"**{icon} {label}**")
+                    with col_info:
+                        with st.popover("ℹ️", use_container_width=True):
+                            st.write(ui_style.SECTION_HELP[key])
+                else:
+                    st.markdown(f"**{icon} {label}**")
+                if count is not None:
+                    st.caption(f"{count} élément(s) enregistré(s)")
+                else:
+                    st.caption("Aperçu rapide")
+                if st.button("Ouvrir", key=f"open_{key}", use_container_width=True):
+                    open_section(key)
+
+    if st.session_state.pop("just_switched_section", False):
+        ui_style.scroll_to_top()
+
+    st.divider()
     st.info("👆 Cliquez sur **Ouvrir** dans une carte ci-dessus pour gérer cette section.")
     st.stop()
 
-col_header, col_close = st.columns([6, 1])
-with col_close:
-    if st.button("✖️ Fermer", use_container_width=True):
+# Une section est ouverte : barre compacte à la place de la grande grille,
+# pour accéder directement au contenu sans avoir à défiler.
+nav_cols = st.columns([1] + [1] * len(cards))
+with nav_cols[0]:
+    if st.button("🏠", key="nav_back_overview", use_container_width=True, help="Retour à l'aperçu"):
         st.session_state["hub_active_section"] = None
+        st.session_state["just_switched_section"] = True
         st.rerun()
+for i, (key, icon, label, count) in enumerate(cards):
+    with nav_cols[i + 1]:
+        if st.button(icon, key=f"nav_{key}", use_container_width=True,
+                     type="primary" if active == key else "secondary", help=label):
+            st.session_state["hub_active_section"] = key
+            st.session_state["just_switched_section"] = True
+            st.rerun()
+
+if st.session_state.pop("just_switched_section", False):
+    ui_style.scroll_to_top()
+
+st.divider()
 
 # ==============================================================================
 # SECTION : OBJECTIFS
@@ -385,42 +403,46 @@ else:
         if objectifs_df.empty:
             st.info("Aucun objectif pour ce projet.")
         else:
-            st.dataframe(
-                objectifs_df[["type_objectif", "titre", "responsable"]].rename(
-                    columns={"type_objectif": "Type", "titre": "Titre", "responsable": "Responsable"}
-                ),
-                use_container_width=True, hide_index=True,
-            )
+            for _, obj in objectifs_df.iterrows():
+                with st.container(border=True):
+                    col1, col2, col3 = st.columns([3, 2, 1.2])
+                    with col1:
+                        st.markdown(f"**[{obj['type_objectif']}] {obj['titre']}**")
+                    with col2:
+                        st.caption(obj["responsable"] or "Sans responsable")
+                    with col3:
+                        if st.button("✏️ Modifier", key=f"editbtn_obj_{obj['id']}", use_container_width=True):
+                            st.session_state["editing_obj_id"] = None if st.session_state.get("editing_obj_id") == obj["id"] else obj["id"]
+                            st.rerun()
 
-            obj_options = {row["id"]: f"[{row['type_objectif']}] {row['titre']}" for _, row in objectifs_df.iterrows()}
-            selected_obj_id = st.selectbox("Modifier un objectif", options=list(obj_options.keys()), format_func=lambda x: obj_options[x])
-            obj = objectifs_df[objectifs_df["id"] == selected_obj_id].iloc[0]
-
-            type_objectif_edit = st.selectbox(
-                "Type", crud.TYPES_OBJECTIF,
-                index=crud.TYPES_OBJECTIF.index(obj["type_objectif"]) if obj["type_objectif"] in crud.TYPES_OBJECTIF else 0,
-                key=f"type_edit_obj_{obj['id']}",
-            )
-            with st.form(f"form_edit_obj_{obj['id']}"):
-                titre = st.text_input("Titre *", value=obj["titre"])
-                responsable_id = None
-                if type_objectif_edit == "Spécifique":
-                    resp_options = responsable_options()
-                    current_resp = obj["responsable_id"] if obj["responsable_id"] in resp_options else None
-                    responsable_id = st.selectbox(
-                        "Responsable", options=list(resp_options.keys()),
-                        format_func=lambda x: resp_options[x],
-                        index=list(resp_options.keys()).index(current_resp),
-                    )
-                col_save, col_delete = st.columns(2)
-                if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                    crud.update_objectif(obj["id"], type_objectif_edit, titre, responsable_id)
-                    st.toast("✅ Objectif mis à jour avec succès.")
-                    st.rerun()
-                if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                    crud.delete_objectif(obj["id"])
-                    st.warning("Objectif supprimé (ainsi que ses résultats, activités et tâches liés).")
-                    st.rerun()
+                    if st.session_state.get("editing_obj_id") == obj["id"]:
+                        type_objectif_edit = st.selectbox(
+                            "Type", crud.TYPES_OBJECTIF,
+                            index=crud.TYPES_OBJECTIF.index(obj["type_objectif"]) if obj["type_objectif"] in crud.TYPES_OBJECTIF else 0,
+                            key=f"type_edit_obj_{obj['id']}",
+                        )
+                        with st.form(f"form_edit_obj_{obj['id']}"):
+                            titre = st.text_input("Titre *", value=obj["titre"])
+                            responsable_id = None
+                            if type_objectif_edit == "Spécifique":
+                                resp_options = responsable_options()
+                                current_resp = obj["responsable_id"] if obj["responsable_id"] in resp_options else None
+                                responsable_id = st.selectbox(
+                                    "Responsable", options=list(resp_options.keys()),
+                                    format_func=lambda x: resp_options[x],
+                                    index=list(resp_options.keys()).index(current_resp),
+                                )
+                            col_save, col_delete = st.columns(2)
+                            if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                crud.update_objectif(obj["id"], type_objectif_edit, titre, responsable_id)
+                                st.toast("✅ Objectif mis à jour avec succès.")
+                                st.session_state["editing_obj_id"] = None
+                                st.rerun()
+                            if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                crud.delete_objectif(obj["id"])
+                                st.warning("Objectif supprimé (ainsi que ses résultats, activités et tâches liés).")
+                                st.session_state["editing_obj_id"] = None
+                                st.rerun()
 
     # ==============================================================================
     # SECTION : RÉSULTATS
@@ -490,46 +512,50 @@ else:
             if resultats_df.empty:
                 st.info("Aucun résultat attendu pour ce projet.")
             else:
-                st.dataframe(
-                    resultats_df[["objectif_titre", "titre", "indicateur", "valeur_cible", "valeur_actuelle", "unite", "statut"]].rename(
-                        columns={"objectif_titre": "Objectif", "titre": "Titre", "indicateur": "Indicateur",
-                                 "valeur_cible": "Cible", "valeur_actuelle": "Actuelle", "unite": "Unité", "statut": "Statut"}
-                    ),
-                    use_container_width=True, hide_index=True,
-                )
+                for _, res in resultats_df.iterrows():
+                    with st.container(border=True):
+                        col1, col2, col3 = st.columns([3, 2, 1.2])
+                        with col1:
+                            st.markdown(f"**{res['titre']}**")
+                            st.caption(f"Objectif : {res['objectif_titre']}")
+                        with col2:
+                            st.caption(f"{res['indicateur'] or 'Sans indicateur'} — {res['valeur_actuelle']}/{res['valeur_cible']} {res['unite'] or ''}")
+                        with col3:
+                            if st.button("✏️ Modifier", key=f"editbtn_res_{res['id']}", use_container_width=True):
+                                st.session_state["editing_res_id"] = None if st.session_state.get("editing_res_id") == res["id"] else res["id"]
+                                st.rerun()
 
-                res_options = {row["id"]: f"{row['titre']} ({row['objectif_titre']})" for _, row in resultats_df.iterrows()}
-                selected_res_id = st.selectbox("Modifier un résultat", options=list(res_options.keys()), format_func=lambda x: res_options[x])
-                res = resultats_df[resultats_df["id"] == selected_res_id].iloc[0]
+                        if st.session_state.get("editing_res_id") == res["id"]:
+                            edit_key = f"edit_res_description_{res['id']}"
+                            if edit_key not in st.session_state:
+                                st.session_state[edit_key] = res["description"] or ""
 
-                edit_key = f"edit_res_description_{res['id']}"
-                if edit_key not in st.session_state:
-                    st.session_state[edit_key] = res["description"] or ""
+                            titre_r = st.text_input("Titre *", value=res["titre"], key=f"edit_res_titre_{res['id']}")
+                            description_r = st.text_area("Description", key=edit_key)
+                            ai_text_toolbar(edit_key, contexte=f"Résultat : {res['titre']} | Indicateur : {res['indicateur'] or ''}")
 
-                titre_r = st.text_input("Titre *", value=res["titre"], key=f"edit_res_titre_{res['id']}")
-                description_r = st.text_area("Description", key=edit_key)
-                ai_text_toolbar(edit_key, contexte=f"Résultat : {res['titre']} | Indicateur : {res['indicateur'] or ''}")
-
-                with st.form(f"form_edit_res_{res['id']}"):
-                    c1, c2, c3 = st.columns(3)
-                    indicateur = c1.text_input("Indicateur", value=res["indicateur"] or "")
-                    valeur_cible = c2.number_input("Valeur cible", value=float(res["valeur_cible"] or 0))
-                    valeur_actuelle = c3.number_input("Valeur actuelle", value=float(res["valeur_actuelle"] or 0))
-                    c4, c5 = st.columns(2)
-                    unite = c4.text_input("Unité", value=res["unite"] or "")
-                    statut_r = c5.selectbox(
-                        "Statut", crud.STATUTS_GENERIQUE,
-                        index=crud.STATUTS_GENERIQUE.index(res["statut"]) if res["statut"] in crud.STATUTS_GENERIQUE else 0,
-                    )
-                    col_save, col_delete = st.columns(2)
-                    if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                        crud.update_resultat(res["id"], titre_r, st.session_state[edit_key], indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
-                        st.toast("✅ Résultat mis à jour avec succès.")
-                        st.rerun()
-                    if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                        crud.delete_resultat(res["id"])
-                        st.warning("Résultat supprimé (ainsi que ses activités et tâches liées).")
-                        st.rerun()
+                            with st.form(f"form_edit_res_{res['id']}"):
+                                c1, c2, c3 = st.columns(3)
+                                indicateur = c1.text_input("Indicateur", value=res["indicateur"] or "")
+                                valeur_cible = c2.number_input("Valeur cible", value=float(res["valeur_cible"] or 0))
+                                valeur_actuelle = c3.number_input("Valeur actuelle", value=float(res["valeur_actuelle"] or 0))
+                                c4, c5 = st.columns(2)
+                                unite = c4.text_input("Unité", value=res["unite"] or "")
+                                statut_r = c5.selectbox(
+                                    "Statut", crud.STATUTS_GENERIQUE,
+                                    index=crud.STATUTS_GENERIQUE.index(res["statut"]) if res["statut"] in crud.STATUTS_GENERIQUE else 0,
+                                )
+                                col_save, col_delete = st.columns(2)
+                                if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                    crud.update_resultat(res["id"], titre_r, st.session_state[edit_key], indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
+                                    st.toast("✅ Résultat mis à jour avec succès.")
+                                    st.session_state["editing_res_id"] = None
+                                    st.rerun()
+                                if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                    crud.delete_resultat(res["id"])
+                                    st.warning("Résultat supprimé (ainsi que ses activités et tâches liées).")
+                                    st.session_state["editing_res_id"] = None
+                                    st.rerun()
 
     # ==============================================================================
     # SECTION : ACTIVITÉS
@@ -600,49 +626,53 @@ else:
             if activites_df.empty:
                 st.info("Aucune activité pour ce projet.")
             else:
-                st.dataframe(
-                    activites_df[["resultat_titre", "titre", "statut", "progression", "budget", "responsable"]].rename(
-                        columns={"resultat_titre": "Résultat", "titre": "Titre", "statut": "Statut",
-                                 "progression": "Progression (%)", "budget": "Budget", "responsable": "Responsable"}
-                    ),
-                    use_container_width=True, hide_index=True,
-                )
+                for _, act in activites_df.iterrows():
+                    with st.container(border=True):
+                        col1, col2, col3 = st.columns([3, 2, 1.2])
+                        with col1:
+                            st.markdown(f"**{act['titre']}**")
+                            st.caption(f"Résultat : {act['resultat_titre']}")
+                        with col2:
+                            st.caption(f"{act['statut']} — {act['progression'] or 0}% — {act['responsable'] or 'Sans responsable'}")
+                        with col3:
+                            if st.button("✏️ Modifier", key=f"editbtn_act_{act['id']}", use_container_width=True):
+                                st.session_state["editing_act_id"] = None if st.session_state.get("editing_act_id") == act["id"] else act["id"]
+                                st.rerun()
 
-                act_options = {row["id"]: f"{row['titre']} ({row['resultat_titre']})" for _, row in activites_df.iterrows()}
-                selected_act_id = st.selectbox("Modifier une activité", options=list(act_options.keys()), format_func=lambda x: act_options[x])
-                act = activites_df[activites_df["id"] == selected_act_id].iloc[0]
-
-                with st.form(f"form_edit_act_{act['id']}"):
-                    titre_a = st.text_input("Titre *", value=act["titre"])
-                    description_a = st.text_area("Description", value=act["description"] or "")
-                    c1, c2 = st.columns(2)
-                    date_debut_a = c1.date_input("Date de début", value=act["date_debut"])
-                    date_fin_a = c2.date_input("Date de fin", value=act["date_fin"])
-                    c3, c4 = st.columns(2)
-                    budget_a = c3.number_input("Budget (FCFA)", min_value=0.0, value=float(act["budget"] or 0))
-                    progression_a = c4.slider("Progression (%)", 0, 100, int(act["progression"] or 0))
-                    statut_a = st.selectbox(
-                        "Statut", crud.STATUTS_GENERIQUE,
-                        index=crud.STATUTS_GENERIQUE.index(act["statut"]) if act["statut"] in crud.STATUTS_GENERIQUE else 0,
-                    )
-                    resp_options = responsable_options()
-                    current_resp = act["responsable_id"] if act["responsable_id"] in resp_options else None
-                    responsable_id_a = st.selectbox(
-                        "Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x],
-                        index=list(resp_options.keys()).index(current_resp),
-                    )
-                    col_save, col_delete = st.columns(2)
-                    if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                        if not validators.dates_valides(date_debut_a, date_fin_a):
-                            st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
-                        else:
-                            crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
-                            st.toast("✅ Activité mise à jour avec succès.")
-                            st.rerun()
-                    if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                        crud.delete_activite(act["id"])
-                        st.warning("Activité supprimée (ainsi que ses tâches liées).")
-                        st.rerun()
+                        if st.session_state.get("editing_act_id") == act["id"]:
+                            with st.form(f"form_edit_act_{act['id']}"):
+                                titre_a = st.text_input("Titre *", value=act["titre"])
+                                description_a = st.text_area("Description", value=act["description"] or "")
+                                c1, c2 = st.columns(2)
+                                date_debut_a = c1.date_input("Date de début", value=act["date_debut"])
+                                date_fin_a = c2.date_input("Date de fin", value=act["date_fin"])
+                                c3, c4 = st.columns(2)
+                                budget_a = c3.number_input("Budget (FCFA)", min_value=0.0, value=float(act["budget"] or 0))
+                                progression_a = c4.slider("Progression (%)", 0, 100, int(act["progression"] or 0))
+                                statut_a = st.selectbox(
+                                    "Statut", crud.STATUTS_GENERIQUE,
+                                    index=crud.STATUTS_GENERIQUE.index(act["statut"]) if act["statut"] in crud.STATUTS_GENERIQUE else 0,
+                                )
+                                resp_options = responsable_options()
+                                current_resp = act["responsable_id"] if act["responsable_id"] in resp_options else None
+                                responsable_id_a = st.selectbox(
+                                    "Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x],
+                                    index=list(resp_options.keys()).index(current_resp),
+                                )
+                                col_save, col_delete = st.columns(2)
+                                if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                    if not validators.dates_valides(date_debut_a, date_fin_a):
+                                        st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
+                                    else:
+                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
+                                        st.toast("✅ Activité mise à jour avec succès.")
+                                        st.session_state["editing_act_id"] = None
+                                        st.rerun()
+                                if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                    crud.delete_activite(act["id"])
+                                    st.warning("Activité supprimée (ainsi que ses tâches liées).")
+                                    st.session_state["editing_act_id"] = None
+                                    st.rerun()
 
     # ==============================================================================
     # SECTION : TÂCHES
@@ -722,61 +752,65 @@ else:
             if taches_df.empty:
                 st.info("Aucune tâche pour ce projet.")
             else:
-                st.dataframe(
-                    taches_df[["activite_titre", "titre", "priorite", "statut", "progression", "responsable"]].rename(
-                        columns={"activite_titre": "Activité", "titre": "Titre", "priorite": "Priorité",
-                                 "statut": "Statut", "progression": "Progression (%)", "responsable": "Responsable"}
-                    ),
-                    use_container_width=True, hide_index=True,
-                )
+                for _, tache in taches_df.iterrows():
+                    with st.container(border=True):
+                        col1, col2, col3 = st.columns([3, 2, 1.2])
+                        with col1:
+                            st.markdown(f"**{tache['titre']}**")
+                            st.caption(f"Activité : {tache['activite_titre']}")
+                        with col2:
+                            st.caption(f"{tache['priorite']} — {tache['statut']} — {tache['progression'] or 0}%")
+                        with col3:
+                            if st.button("✏️ Modifier", key=f"editbtn_tache_{tache['id']}", use_container_width=True):
+                                st.session_state["editing_tache_id"] = None if st.session_state.get("editing_tache_id") == tache["id"] else tache["id"]
+                                st.rerun()
 
-                tache_options = {row["id"]: f"{row['titre']} ({row['activite_titre']})" for _, row in taches_df.iterrows()}
-                selected_tache_id = st.selectbox("Modifier une tâche", options=list(tache_options.keys()), format_func=lambda x: tache_options[x])
-                tache = taches_df[taches_df["id"] == selected_tache_id].iloc[0]
-
-                with st.form(f"form_edit_tache_{tache['id']}"):
-                    titre_t = st.text_input("Titre *", value=tache["titre"])
-                    description_t = st.text_area("Description", value=tache["description"] or "")
-                    c1, c2 = st.columns(2)
-                    priorite_t = c1.selectbox(
-                        "Priorité", crud.PRIORITES_TACHE,
-                        index=crud.PRIORITES_TACHE.index(tache["priorite"]) if tache["priorite"] in crud.PRIORITES_TACHE else 0,
-                    )
-                    statut_t = c2.selectbox(
-                        "Statut", crud.STATUTS_GENERIQUE,
-                        index=crud.STATUTS_GENERIQUE.index(tache["statut"]) if tache["statut"] in crud.STATUTS_GENERIQUE else 0,
-                    )
-                    c3, c4 = st.columns(2)
-                    date_debut_t = c3.date_input("Date de début", value=tache["date_debut"])
-                    date_fin_t = c4.date_input("Date de fin", value=tache["date_fin"])
-                    _act_row_for_caption = activites_df[activites_df["id"] == tache["activite_id"]].iloc[0]
-                    st.caption(f"📅 Période de l'activité « {_act_row_for_caption['titre']} » : {_act_row_for_caption['date_debut'] or 'non définie'} → {_act_row_for_caption['date_fin'] or 'non définie'}")
-                    progression_t = st.slider("Progression (%)", 0, 100, int(tache["progression"] or 0))
-                    resp_options = responsable_options()
-                    current_resp = tache["responsable_id"] if tache["responsable_id"] in resp_options else None
-                    responsable_id_t = st.selectbox(
-                        "Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x],
-                        index=list(resp_options.keys()).index(current_resp),
-                    )
-                    col_save, col_delete = st.columns(2)
-                    if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                        act_row = activites_df[activites_df["id"] == tache["activite_id"]].iloc[0]
-                        if not validators.dates_valides(date_debut_t, date_fin_t):
-                            st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
-                        elif not validators.tache_dans_intervalle_activite(date_debut_t, date_fin_t, act_row["date_debut"], act_row["date_fin"]):
-                            st.warning(
-                                f"⚠️ Les dates de la tâche doivent rester dans la période de l'activité "
-                                f"« {act_row['titre']} » ({act_row['date_debut']} → {act_row['date_fin']}). "
-                                "Corrigez les dates ci-dessus et réessayez — le reste de vos informations est conservé."
-                            )
-                        else:
-                            crud.update_tache(tache["id"], titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
-                            st.toast("✅ Tâche mise à jour avec succès.")
-                            st.rerun()
-                    if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                        crud.delete_tache(tache["id"])
-                        st.warning("Tâche supprimée.")
-                        st.rerun()
+                        if st.session_state.get("editing_tache_id") == tache["id"]:
+                            with st.form(f"form_edit_tache_{tache['id']}"):
+                                titre_t = st.text_input("Titre *", value=tache["titre"])
+                                description_t = st.text_area("Description", value=tache["description"] or "")
+                                c1, c2 = st.columns(2)
+                                priorite_t = c1.selectbox(
+                                    "Priorité", crud.PRIORITES_TACHE,
+                                    index=crud.PRIORITES_TACHE.index(tache["priorite"]) if tache["priorite"] in crud.PRIORITES_TACHE else 0,
+                                )
+                                statut_t = c2.selectbox(
+                                    "Statut", crud.STATUTS_GENERIQUE,
+                                    index=crud.STATUTS_GENERIQUE.index(tache["statut"]) if tache["statut"] in crud.STATUTS_GENERIQUE else 0,
+                                )
+                                c3, c4 = st.columns(2)
+                                date_debut_t = c3.date_input("Date de début", value=tache["date_debut"])
+                                date_fin_t = c4.date_input("Date de fin", value=tache["date_fin"])
+                                _act_row_for_caption = activites_df[activites_df["id"] == tache["activite_id"]].iloc[0]
+                                st.caption(f"📅 Période de l'activité « {_act_row_for_caption['titre']} » : {_act_row_for_caption['date_debut'] or 'non définie'} → {_act_row_for_caption['date_fin'] or 'non définie'}")
+                                progression_t = st.slider("Progression (%)", 0, 100, int(tache["progression"] or 0))
+                                resp_options = responsable_options()
+                                current_resp = tache["responsable_id"] if tache["responsable_id"] in resp_options else None
+                                responsable_id_t = st.selectbox(
+                                    "Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x],
+                                    index=list(resp_options.keys()).index(current_resp),
+                                )
+                                col_save, col_delete = st.columns(2)
+                                if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                    act_row = activites_df[activites_df["id"] == tache["activite_id"]].iloc[0]
+                                    if not validators.dates_valides(date_debut_t, date_fin_t):
+                                        st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
+                                    elif not validators.tache_dans_intervalle_activite(date_debut_t, date_fin_t, act_row["date_debut"], act_row["date_fin"]):
+                                        st.warning(
+                                            f"⚠️ Les dates de la tâche doivent rester dans la période de l'activité "
+                                            f"« {act_row['titre']} » ({act_row['date_debut']} → {act_row['date_fin']}). "
+                                            "Corrigez les dates ci-dessus et réessayez — le reste de vos informations est conservé."
+                                        )
+                                    else:
+                                        crud.update_tache(tache["id"], titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
+                                        st.toast("✅ Tâche mise à jour avec succès.")
+                                        st.session_state["editing_tache_id"] = None
+                                        st.rerun()
+                                if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                    crud.delete_tache(tache["id"])
+                                    st.warning("Tâche supprimée.")
+                                    st.session_state["editing_tache_id"] = None
+                                    st.rerun()
 
     # ==============================================================================
     # SECTION : INDICATEURS (vue transversale sur tous les résultats du projet)
@@ -878,35 +912,40 @@ else:
         if parties_prenantes_df.empty:
             st.info("Aucune partie prenante enregistrée pour ce projet.")
         else:
-            st.dataframe(
-                parties_prenantes_df[["nom", "type_partie", "role_contribution", "contact"]].rename(
-                    columns={"nom": "Nom", "type_partie": "Type", "role_contribution": "Rôle / contribution", "contact": "Contact"}
-                ),
-                use_container_width=True, hide_index=True,
-            )
+            for _, partie in parties_prenantes_df.iterrows():
+                with st.container(border=True):
+                    col1, col2, col3 = st.columns([3, 2, 1.2])
+                    with col1:
+                        st.markdown(f"**{partie['nom']}**")
+                        st.caption(partie["type_partie"] or "")
+                    with col2:
+                        st.caption(partie["contact"] or "Sans contact")
+                    with col3:
+                        if st.button("✏️ Modifier", key=f"editbtn_partie_{partie['id']}", use_container_width=True):
+                            st.session_state["editing_partie_id"] = None if st.session_state.get("editing_partie_id") == partie["id"] else partie["id"]
+                            st.rerun()
 
-            partie_options = {row["id"]: row["nom"] for _, row in parties_prenantes_df.iterrows()}
-            selected_partie_id = st.selectbox("Modifier une partie prenante", options=list(partie_options.keys()), format_func=lambda x: partie_options[x])
-            partie = parties_prenantes_df[parties_prenantes_df["id"] == selected_partie_id].iloc[0]
-
-            with st.form(f"form_edit_partie_{partie['id']}"):
-                nom_p = st.text_input("Nom *", value=partie["nom"])
-                c1, c2 = st.columns(2)
-                type_p = c1.selectbox(
-                    "Type", crud.TYPES_PARTIE_PRENANTE,
-                    index=crud.TYPES_PARTIE_PRENANTE.index(partie["type_partie"]) if partie["type_partie"] in crud.TYPES_PARTIE_PRENANTE else 0,
-                )
-                contact_p = c2.text_input("Contact", value=partie["contact"] or "")
-                role_p = st.text_area("Rôle / contribution", value=partie["role_contribution"] or "")
-                col_save, col_delete = st.columns(2)
-                if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                    crud.update_partie_prenante(partie["id"], nom_p, type_p, role_p, contact_p)
-                    st.toast("✅ Partie prenante mise à jour avec succès.")
-                    st.rerun()
-                if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                    crud.delete_partie_prenante(partie["id"])
-                    st.warning("Partie prenante supprimée.")
-                    st.rerun()
+                    if st.session_state.get("editing_partie_id") == partie["id"]:
+                        with st.form(f"form_edit_partie_{partie['id']}"):
+                            nom_p = st.text_input("Nom *", value=partie["nom"])
+                            c1, c2 = st.columns(2)
+                            type_p = c1.selectbox(
+                                "Type", crud.TYPES_PARTIE_PRENANTE,
+                                index=crud.TYPES_PARTIE_PRENANTE.index(partie["type_partie"]) if partie["type_partie"] in crud.TYPES_PARTIE_PRENANTE else 0,
+                            )
+                            contact_p = c2.text_input("Contact", value=partie["contact"] or "")
+                            role_p = st.text_area("Rôle / contribution", value=partie["role_contribution"] or "")
+                            col_save, col_delete = st.columns(2)
+                            if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                crud.update_partie_prenante(partie["id"], nom_p, type_p, role_p, contact_p)
+                                st.toast("✅ Partie prenante mise à jour avec succès.")
+                                st.session_state["editing_partie_id"] = None
+                                st.rerun()
+                            if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                crud.delete_partie_prenante(partie["id"])
+                                st.warning("Partie prenante supprimée.")
+                                st.session_state["editing_partie_id"] = None
+                                st.rerun()
 
     # ==============================================================================
     # SECTION : DOCUMENTS

@@ -102,6 +102,15 @@ def inject_global_style():
     )
 
 
+def scroll_to_top():
+    """Force un retour en haut de la page — à appeler juste après un changement de section,
+    pas à chaque rerun (sinon ça interromprait la saisie dans les formulaires)."""
+    st.markdown(
+        "<script>window.scrollTo({top: 0, behavior: 'instant'});</script>",
+        unsafe_allow_html=True,
+    )
+
+
 def tip(key, text):
     """Astuce discrète et masquable, affichée une fois par section (par clé unique)."""
     if st.session_state.get(f"tip_hidden_{key}"):

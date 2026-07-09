@@ -128,13 +128,23 @@ def tip(key, text):
             st.rerun()
 
 
-def ai_text_toolbar(key, contexte=""):
+def ai_text_field(label, key, contexte="", height=None, is_area=True):
     """
-    Barre d'outils IA (Améliorer / Pro / Résumer / Développer) pour un champ de texte.
-    Doit être appelée juste après le widget (st.text_area/text_input) identifié par `key`,
-    et EN DEHORS de tout st.form (les boutons normaux n'interagissent pas dans un formulaire).
+    Champ de texte avec assistance IA intégrée (Améliorer / Pro / Résumer / Développer).
+
+    Remplace un appel direct à st.text_area/st.text_input : gère correctement le fait
+    que Streamlit interdit de modifier st.session_state[key] après que le widget
+    correspondant a déjà été instancié dans le même run. La mise à jour IA est donc
+    appliquée juste AVANT de créer le widget, au run suivant.
     """
-    import ai_text_assist
+    pending_key = f"{key}_pending"
+    if pending_key in st.session_state:
+        st.session_state[key] = st.session_state.pop(pending_key)
+
+    if is_area:
+        value = st.text_area(label, key=key, height=height) if height else st.text_area(label, key=key)
+    else:
+        value = st.text_input(label, key=key)
 
     cols = st.columns(4)
     boutons = [
@@ -143,18 +153,21 @@ def ai_text_toolbar(key, contexte=""):
         ("✂️ Résumer", "resumer"),
         ("➕ Développer", "developper"),
     ]
-    for col, (label, mode) in zip(cols, boutons):
+    for col, (btn_label, mode) in zip(cols, boutons):
         with col:
-            if st.button(label, key=f"{key}_btn_{mode}", use_container_width=True):
+            if st.button(btn_label, key=f"{key}_btn_{mode}", use_container_width=True):
+                import ai_text_assist
                 try:
                     with st.spinner("L'IA travaille..."):
                         nouveau_texte = ai_text_assist.rewrite_text(st.session_state.get(key, ""), mode, contexte)
-                    st.session_state[key] = nouveau_texte
+                    st.session_state[pending_key] = nouveau_texte
                     st.rerun()
                 except RuntimeError as e:
                     st.error(str(e))
                 except Exception as e:
                     st.error(f"Erreur IA : {e}")
+
+    return value
 
 
 def sidebar_brand():

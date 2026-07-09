@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import require_login, logout_button
-from ui_style import sidebar_brand, section_title, tip, ai_text_toolbar
+from ui_style import sidebar_brand, section_title, tip, ai_text_field
 import crud
 import validators
 
@@ -17,8 +17,7 @@ tip("nouveau_projet_contexte", "Décrivez brièvement le problème auquel votre 
 
 # En dehors du formulaire pour permettre les boutons d'assistance IA
 nom = st.text_input("Nom du projet *", key="new_projet_nom")
-description = st.text_area("Description", key="new_projet_description")
-ai_text_toolbar("new_projet_description", contexte=f"Nom du projet : {nom}" if nom else "")
+description = ai_text_field("Description", key="new_projet_description", contexte=f"Nom du projet : {nom}" if nom else "")
 
 with st.form("form_new_projet_quick"):
     with st.expander("➕ Informations complémentaires (facultatif — modifiable plus tard)"):

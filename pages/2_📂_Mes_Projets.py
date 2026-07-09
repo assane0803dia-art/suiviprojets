@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from auth import require_login, logout_button
 import auth
-from ui_style import sidebar_brand, section_title, badge_html, tip, ai_text_toolbar
+from ui_style import sidebar_brand, section_title, badge_html, tip, ai_text_field
 import ui_style
 import crud
 import validators
@@ -203,6 +203,27 @@ cards = [
 
 active = st.session_state["hub_active_section"]
 
+# ----------------------------------------------------------------------------
+# Navigation entre sections — menu déroulant (lisible et utilisable au doigt,
+# sans survol, contrairement à une barre d'icônes)
+# ----------------------------------------------------------------------------
+nav_options = [("overview", "🏠 Vue d'ensemble")] + [(key, f"{icon} {label}") for key, icon, label, count in cards]
+nav_labels = dict(nav_options)
+nav_keys = [k for k, _ in nav_options]
+current_nav_key = active if active in nav_keys else "overview"
+
+selected_nav = st.selectbox(
+    "Aller à la section",
+    options=nav_keys,
+    index=nav_keys.index(current_nav_key),
+    format_func=lambda k: nav_labels[k],
+)
+
+if selected_nav != current_nav_key:
+    st.session_state["hub_active_section"] = None if selected_nav == "overview" else selected_nav
+    st.session_state["just_switched_section"] = True
+    st.rerun()
+
 if active is None:
     grid_cols = st.columns(4)
     for i, (key, icon, label, count) in enumerate(cards):
@@ -228,24 +249,8 @@ if active is None:
         ui_style.scroll_to_top()
 
     st.divider()
-    st.info("👆 Cliquez sur **Ouvrir** dans une carte ci-dessus pour gérer cette section.")
+    st.info("👆 Cliquez sur **Ouvrir** dans une carte, ou utilisez le menu déroulant ci-dessus.")
     st.stop()
-
-# Une section est ouverte : barre compacte à la place de la grande grille,
-# pour accéder directement au contenu sans avoir à défiler.
-nav_cols = st.columns([1] + [1] * len(cards))
-with nav_cols[0]:
-    if st.button("🏠", key="nav_back_overview", use_container_width=True, help="Retour à l'aperçu"):
-        st.session_state["hub_active_section"] = None
-        st.session_state["just_switched_section"] = True
-        st.rerun()
-for i, (key, icon, label, count) in enumerate(cards):
-    with nav_cols[i + 1]:
-        if st.button(icon, key=f"nav_{key}", use_container_width=True,
-                     type="primary" if active == key else "secondary", help=label):
-            st.session_state["hub_active_section"] = key
-            st.session_state["just_switched_section"] = True
-            st.rerun()
 
 if st.session_state.pop("just_switched_section", False):
     ui_style.scroll_to_top()
@@ -461,8 +466,10 @@ else:
                 objectif_id = st.selectbox("Objectif concerné *", options=list(obj_options.keys()), format_func=lambda x: obj_options[x], key="new_res_objectif")
 
                 titre_r = st.text_input("Titre *", key="new_res_titre")
-                description_r = st.text_area("Description", key="new_res_description")
-                ai_text_toolbar("new_res_description", contexte=f"Projet : {projet_row['description'] or ''} | Objectif : {obj_options.get(objectif_id, '')}")
+                description_r = ai_text_field(
+                    "Description", key="new_res_description",
+                    contexte=f"Projet : {projet_row['description'] or ''} | Objectif : {obj_options.get(objectif_id, '')}",
+                )
 
                 if st.button("✨ Suggérer des résultats avec l'IA", key="suggest_res_btn"):
                     try:
@@ -531,8 +538,10 @@ else:
                                 st.session_state[edit_key] = res["description"] or ""
 
                             titre_r = st.text_input("Titre *", value=res["titre"], key=f"edit_res_titre_{res['id']}")
-                            description_r = st.text_area("Description", key=edit_key)
-                            ai_text_toolbar(edit_key, contexte=f"Résultat : {res['titre']} | Indicateur : {res['indicateur'] or ''}")
+                            description_r = ai_text_field(
+                                "Description", key=edit_key,
+                                contexte=f"Résultat : {res['titre']} | Indicateur : {res['indicateur'] or ''}",
+                            )
 
                             with st.form(f"form_edit_res_{res['id']}"):
                                 c1, c2, c3 = st.columns(3)

@@ -190,12 +190,15 @@ taches_df = crud.get_taches_by_projet(selected_projet_id)
 parties_prenantes_df = crud.get_parties_prenantes(selected_projet_id)
 documents_df = crud.get_documents(selected_projet_id)
 
+nb_indicateurs_principaux = len(resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")]) if not resultats_df.empty else 0
+nb_indicateurs_suppl = len(crud.get_indicateurs_supplementaires_by_projet(selected_projet_id))
+
 cards = [
     ("objectifs", "🎯", "Objectifs spécifiques", len(objectifs_df)),
     ("resultats", "📈", "Résultats attendus", len(resultats_df)),
     ("activites", "📅", "Activités", len(activites_df)),
     ("taches", "✅", "Tâches", len(taches_df)),
-    ("indicateurs", "📊", "Indicateurs", len(resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")]) if not resultats_df.empty else 0),
+    ("indicateurs", "📊", "Indicateurs", nb_indicateurs_principaux + nb_indicateurs_suppl),
     ("budget", "💰", "Budget", None),
     ("parties_prenantes", "👥", "Parties prenantes", len(parties_prenantes_df)),
     ("documents", "📄", "Documents", len(documents_df)),
@@ -532,6 +535,59 @@ else:
                                 st.session_state["editing_res_id"] = None if st.session_state.get("editing_res_id") == res["id"] else res["id"]
                                 st.rerun()
 
+                        indicateurs_suppl = crud.get_indicateurs_supplementaires(res["id"])
+                        with st.expander(f"📊 Indicateurs ({1 + len(indicateurs_suppl)})"):
+                            st.caption(f"**Principal** — {res['indicateur'] or 'Sans nom'} : {res['valeur_actuelle']}/{res['valeur_cible']} {res['unite'] or ''} *(modifiable via « ✏️ Modifier » ci-dessus)*")
+
+                            for _, ind in indicateurs_suppl.iterrows():
+                                ic1, ic2, ic3 = st.columns([3, 1.5, 1])
+                                with ic1:
+                                    st.write(f"**{ind['nom']}**")
+                                with ic2:
+                                    st.caption(f"{ind['valeur_actuelle']}/{ind['valeur_cible']} {ind['unite'] or ''}")
+                                with ic3:
+                                    if st.button("✏️", key=f"editbtn_ind_{ind['id']}", use_container_width=True, help="Modifier"):
+                                        st.session_state["editing_ind_id"] = None if st.session_state.get("editing_ind_id") == ind["id"] else ind["id"]
+                                        st.rerun()
+
+                                if st.session_state.get("editing_ind_id") == ind["id"]:
+                                    with st.form(f"form_edit_ind_{ind['id']}"):
+                                        nom_ind = st.text_input("Nom de l'indicateur *", value=ind["nom"])
+                                        jc1, jc2, jc3 = st.columns(3)
+                                        cible_ind = jc1.number_input("Valeur cible", value=float(ind["valeur_cible"] or 0), key=f"cible_ind_{ind['id']}")
+                                        actuelle_ind = jc2.number_input("Valeur actuelle", value=float(ind["valeur_actuelle"] or 0), key=f"actuelle_ind_{ind['id']}")
+                                        unite_ind = jc3.text_input("Unité", value=ind["unite"] or "", key=f"unite_ind_{ind['id']}")
+                                        col_save_ind, col_del_ind = st.columns(2)
+                                        if col_save_ind.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                            if not nom_ind:
+                                                st.warning("Le nom est obligatoire.")
+                                            else:
+                                                crud.update_indicateur_supplementaire(ind["id"], nom_ind, cible_ind, actuelle_ind, unite_ind)
+                                                st.toast("✅ Indicateur mis à jour avec succès.")
+                                                st.session_state["editing_ind_id"] = None
+                                                st.rerun()
+                                        if col_del_ind.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                            crud.delete_indicateur_supplementaire(ind["id"])
+                                            st.warning("Indicateur supprimé.")
+                                            st.session_state["editing_ind_id"] = None
+                                            st.rerun()
+
+                            st.divider()
+                            st.caption("➕ Ajouter un indicateur")
+                            with st.form(f"form_new_ind_{res['id']}", clear_on_submit=True):
+                                nom_new_ind = st.text_input("Nom de l'indicateur *")
+                                kc1, kc2, kc3 = st.columns(3)
+                                cible_new_ind = kc1.number_input("Valeur cible", key=f"new_ind_cible_{res['id']}")
+                                actuelle_new_ind = kc2.number_input("Valeur actuelle", key=f"new_ind_actuelle_{res['id']}")
+                                unite_new_ind = kc3.text_input("Unité", key=f"new_ind_unite_{res['id']}")
+                                if st.form_submit_button("Ajouter un indicateur", use_container_width=True):
+                                    if not nom_new_ind:
+                                        st.warning("Le nom est obligatoire.")
+                                    else:
+                                        crud.create_indicateur_supplementaire(res["id"], nom_new_ind, cible_new_ind, actuelle_new_ind, unite_new_ind)
+                                        st.toast("✅ Indicateur ajouté avec succès.")
+                                        st.rerun()
+
                         if st.session_state.get("editing_res_id") == res["id"]:
                             edit_key = f"edit_res_description_{res['id']}"
                             if edit_key not in st.session_state:
@@ -830,11 +886,12 @@ else:
         st.caption("Mettez à jour rapidement la valeur actuelle de chaque indicateur, sans naviguer dans la hiérarchie.")
 
         indicateurs_df = resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")] if not resultats_df.empty else resultats_df
+        indicateurs_suppl_df = crud.get_indicateurs_supplementaires_by_projet(selected_projet_id)
 
-        if indicateurs_df.empty:
+        if indicateurs_df.empty and indicateurs_suppl_df.empty:
             st.info(
                 "Aucun indicateur défini. Les indicateurs se définissent au niveau des résultats attendus "
-                "(champ « Indicateur » du formulaire)."
+                "(champ « Indicateur » du formulaire, ou bouton « ➕ Ajouter un indicateur »)."
             )
             if st.button("📈 Ouvrir la section Résultats"):
                 open_section("resultats")
@@ -854,6 +911,24 @@ else:
                         )
                         if st.button("Mettre à jour", key=f"indic_update_{row['id']}", use_container_width=True):
                             crud.update_resultat_valeur_actuelle(row["id"], new_val)
+                            st.toast("✅ Indicateur mis à jour avec succès.")
+                            st.rerun()
+
+            for _, row in indicateurs_suppl_df.iterrows():
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    with c1:
+                        st.markdown(f"**{row['nom']}**")
+                        st.caption(f"{row['resultat_titre']} — {row['objectif_titre']}")
+                    with c2:
+                        st.metric("Cible", f"{row['valeur_cible']:.0f} {row['unite'] or ''}")
+                    with c3:
+                        new_val = st.number_input(
+                            "Valeur actuelle", value=float(row["valeur_actuelle"] or 0),
+                            key=f"indic_suppl_val_{row['id']}", label_visibility="visible",
+                        )
+                        if st.button("Mettre à jour", key=f"indic_suppl_update_{row['id']}", use_container_width=True):
+                            crud.update_indicateur_supplementaire(row["id"], row["nom"], row["valeur_cible"], new_val, row["unite"])
                             st.toast("✅ Indicateur mis à jour avec succès.")
                             st.rerun()
 

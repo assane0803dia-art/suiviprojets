@@ -25,6 +25,7 @@ class ProjectSnapshot:
     resultats: list
     activites: list
     taches: list
+    indicateurs_supplementaires: list = None
 
 
 def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapshot:
@@ -33,6 +34,7 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
     resultats_df = crud_module.get_resultats_by_projet(projet_id)
     activites_df = crud_module.get_activites_by_projet(projet_id)
     taches_df = crud_module.get_taches_by_projet(projet_id)
+    indicateurs_suppl_df = crud_module.get_indicateurs_supplementaires_by_projet(projet_id)
 
     return ProjectSnapshot(
         projet=projet_row.to_dict(),
@@ -40,6 +42,7 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
         resultats=resultats_df.to_dict("records"),
         activites=activites_df.to_dict("records"),
         taches=taches_df.to_dict("records"),
+        indicateurs_supplementaires=indicateurs_suppl_df.to_dict("records"),
     )
 
 
@@ -109,6 +112,12 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
             f"  • Résultat « {r.get('titre')} » — indicateur : {r.get('indicateur') or 'N/A'} "
             f"({actuelle}/{cible} {r.get('unite') or ''})"
         )
+        for ind in (snapshot.indicateurs_supplementaires or []):
+            if ind.get("resultat_titre") == r.get("titre"):
+                lignes.append(
+                    f"    - Indicateur additionnel : {ind.get('nom')} "
+                    f"({ind.get('valeur_actuelle')}/{ind.get('valeur_cible')} {ind.get('unite') or ''})"
+                )
 
     lignes.append("")
     lignes.append("ACTIVITÉS (réalisées ou en cours) :")

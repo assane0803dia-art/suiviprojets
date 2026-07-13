@@ -174,6 +174,7 @@ def delete_resultat(id):
     activites = run_query("SELECT id FROM Activites WHERE resultat_id=%s", params=(id,))
     for act_id in activites["id"]:
         delete_activite(act_id)
+    run_execute("DELETE FROM Indicateurs_Supplementaires WHERE resultat_id=%s", (id,))
     run_execute("DELETE FROM Resultats WHERE id=%s", (id,))
 
 
@@ -328,6 +329,49 @@ def revoke_acces_lecteur(user_id, projet_id):
 
 def update_resultat_valeur_actuelle(id, valeur_actuelle):
     run_execute("UPDATE Resultats SET valeur_actuelle=%s WHERE id=%s", (valeur_actuelle, id))
+
+
+# ----------------------------------------------------------------------------
+# Indicateurs supplémentaires (au-delà de l'indicateur principal d'un résultat)
+# ----------------------------------------------------------------------------
+def get_indicateurs_supplementaires(resultat_id):
+    return run_query(
+        "SELECT id, nom, valeur_cible, valeur_actuelle, unite FROM Indicateurs_Supplementaires "
+        "WHERE resultat_id = %s ORDER BY date_ajout",
+        params=(resultat_id,),
+    )
+
+
+def get_indicateurs_supplementaires_by_projet(projet_id):
+    return run_query(
+        """SELECT I.id, I.nom, I.valeur_cible, I.valeur_actuelle, I.unite,
+                  R.titre AS resultat_titre, O.titre AS objectif_titre
+           FROM Indicateurs_Supplementaires I
+           JOIN Resultats R ON I.resultat_id = R.id
+           JOIN Objectifs O ON R.objectif_id = O.id
+           WHERE O.projet_id = %s
+           ORDER BY R.titre, I.nom""",
+        params=(projet_id,),
+    )
+
+
+def create_indicateur_supplementaire(resultat_id, nom, valeur_cible, valeur_actuelle, unite):
+    return run_execute(
+        "INSERT INTO Indicateurs_Supplementaires (resultat_id, nom, valeur_cible, valeur_actuelle, unite) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (resultat_id, nom, valeur_cible, valeur_actuelle, unite),
+    )
+
+
+def update_indicateur_supplementaire(id, nom, valeur_cible, valeur_actuelle, unite):
+    run_execute(
+        "UPDATE Indicateurs_Supplementaires SET nom=%s, valeur_cible=%s, valeur_actuelle=%s, unite=%s WHERE id=%s",
+        (nom, valeur_cible, valeur_actuelle, unite, id),
+    )
+
+
+def delete_indicateur_supplementaire(id):
+    run_execute("DELETE FROM Indicateurs_Supplementaires WHERE id=%s", (id,))
 
 
 # ----------------------------------------------------------------------------

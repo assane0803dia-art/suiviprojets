@@ -9,6 +9,7 @@ from indicators_config import (
     format_kpi_value,
 )
 import db
+import crud
 
 
 require_login()
@@ -111,7 +112,52 @@ if NOM_COLONNE_PROGRESSION in df.columns:
 st.dataframe(df, use_container_width=True, hide_index=True, column_config=column_config)
 
 st.divider()
+
+# ----------------------------------------------------------------------------
+# Export pour Power BI / analyse externe
+# ----------------------------------------------------------------------------
+section_title("📥", "Exporter pour Power BI")
 st.caption(
-    "🤖 La génération automatique de rapports d'exécution par IA sera bientôt disponible "
-    "depuis la page **📂 Mes projets**."
+    "Téléchargez les données de tous vos projets sous forme de tables reliées "
+    "(par identifiants), prêtes à être importées dans Power BI, Excel ou tout autre "
+    "outil d'analyse. Chaque table conserve ses colonnes d'identifiants pour recréer "
+    "les relations (projet_id, objectif_id, resultat_id, activite_id)."
 )
+
+if st.button("📥 Générer l'export (ZIP de fichiers CSV)", type="primary"):
+    import io
+    import zipfile
+
+    tables = {
+        "projets.csv": crud.export_projets(),
+        "objectifs.csv": crud.export_objectifs(),
+        "resultats.csv": crud.export_resultats(),
+        "activites.csv": crud.export_activites(),
+        "taches.csv": crud.export_taches(),
+        "indicateurs.csv": crud.export_indicateurs(),
+    }
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for filename, table_df in tables.items():
+            zf.writestr(filename, table_df.to_csv(index=False))
+
+    st.session_state["powerbi_export"] = buffer.getvalue()
+
+if "powerbi_export" in st.session_state:
+    st.download_button(
+        "⬇️ Télécharger l'export (.zip)",
+        data=st.session_state["powerbi_export"],
+        file_name="suiviprojets_export_powerbi.zip",
+        mime="application/zip",
+    )
+
+with st.expander("ℹ️ Comment importer ça dans Power BI"):
+    st.markdown("""
+1. Décompressez le fichier `.zip` téléchargé.
+2. Dans Power BI Desktop : **Accueil → Obtenir les données → Texte/CSV**, importez les 6 fichiers un par un.
+3. Dans **Gérer les relations**, reliez les tables par leurs colonnes d'identifiants :
+   `objectifs.projet_id → projets.projet_id`, `resultats.objectif_id → objectifs.objectif_id`,
+   `activites.resultat_id → resultats.resultat_id`, `taches.activite_id → activites.activite_id`.
+4. Construisez vos visuels normalement — toutes les tables sont désormais reliées.
+    """)

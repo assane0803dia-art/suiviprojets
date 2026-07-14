@@ -355,6 +355,76 @@ def get_indicateurs_supplementaires_by_projet(projet_id):
     )
 
 
+# ----------------------------------------------------------------------------
+# Export pour Power BI / analyse externe — tables relationnelles à plat,
+# sur l'ensemble des projets (chaque table garde ses clés id/parent_id pour
+# permettre de recréer les relations dans Power BI).
+# ----------------------------------------------------------------------------
+def export_projets():
+    return run_query("""
+        SELECT P.id AS projet_id, P.nom, P.description, P.date_debut, P.date_fin,
+               P.budget, P.statut, U.nom AS responsable
+        FROM Projets P
+        LEFT JOIN Utilisateurs U ON P.responsable_id = U.id
+        ORDER BY P.id
+    """)
+
+
+def export_objectifs():
+    return run_query("""
+        SELECT O.id AS objectif_id, O.projet_id, O.type_objectif, O.titre, U.nom AS responsable
+        FROM Objectifs O
+        LEFT JOIN Utilisateurs U ON O.responsable_id = U.id
+        ORDER BY O.projet_id, O.id
+    """)
+
+
+def export_resultats():
+    return run_query("""
+        SELECT R.id AS resultat_id, O.projet_id, R.objectif_id, R.titre, R.indicateur,
+               R.valeur_cible, R.valeur_actuelle, R.unite, R.statut
+        FROM Resultats R
+        JOIN Objectifs O ON R.objectif_id = O.id
+        ORDER BY O.projet_id, R.id
+    """)
+
+
+def export_activites():
+    return run_query("""
+        SELECT A.id AS activite_id, O.projet_id, A.resultat_id, A.titre, A.statut,
+               A.date_debut, A.date_fin, A.budget, A.progression, U.nom AS responsable
+        FROM Activites A
+        JOIN Resultats R ON A.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        LEFT JOIN Utilisateurs U ON A.responsable_id = U.id
+        ORDER BY O.projet_id, A.id
+    """)
+
+
+def export_taches():
+    return run_query("""
+        SELECT T.id AS tache_id, O.projet_id, T.activite_id, T.titre, T.priorite, T.statut,
+               T.date_debut, T.date_fin, T.progression, U.nom AS responsable
+        FROM Taches T
+        JOIN Activites A ON T.activite_id = A.id
+        JOIN Resultats R ON A.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        LEFT JOIN Utilisateurs U ON T.responsable_id = U.id
+        ORDER BY O.projet_id, T.id
+    """)
+
+
+def export_indicateurs():
+    return run_query("""
+        SELECT I.id AS indicateur_id, O.projet_id, I.resultat_id, I.nom,
+               I.valeur_cible, I.valeur_actuelle, I.unite
+        FROM Indicateurs_Supplementaires I
+        JOIN Resultats R ON I.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        ORDER BY O.projet_id, I.id
+    """)
+
+
 def create_indicateur_supplementaire(resultat_id, nom, valeur_cible, valeur_actuelle, unite):
     return run_execute(
         "INSERT INTO Indicateurs_Supplementaires (resultat_id, nom, valeur_cible, valeur_actuelle, unite) "

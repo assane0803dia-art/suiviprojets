@@ -104,7 +104,7 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
         "OBJECTIFS ET RÉSULTATS ATTENDUS (avec indicateurs) :",
     ]
     for o in snapshot.objectifs:
-        lignes.append(f"- [{o.get('type_objectif')}] {o.get('titre')}")
+        lignes.append(f"- {o.get('titre')} (objectif {(o.get('type_objectif') or '').lower()})")
     for r in snapshot.resultats:
         cible = r.get("valeur_cible")
         actuelle = r.get("valeur_actuelle")
@@ -169,7 +169,10 @@ Consignes :
 - Si une section manque de données suffisantes (ex: pas de description fournie pour le
   Contexte), indique-le brièvement ("Non renseigné" ou équivalent) plutôt que d'inventer.
 - Reste factuel et professionnel, 500-800 mots au total.
-- N'utilise pas de tableaux Markdown, uniquement des paragraphes et des listes à puces."""
+- N'utilise pas de tableaux Markdown, uniquement des paragraphes et des listes à puces.
+- N'utilise ni crochets [ ] ni mise en gras ** ** au fil du texte — écris les noms de
+  projet, d'objectifs, d'activités et de résultats en texte simple, sans ponctuation
+  ni symbole superflu autour."""
 
 
 def generate_recommendations(snapshot: ProjectSnapshot, risques: dict) -> str:

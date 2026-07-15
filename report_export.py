@@ -1,15 +1,19 @@
 """
-Convertit un rapport texte (format Markdown simple : ## titres, - listes) en fichiers
-Word (.docx) et PDF téléchargeables.
+Convertit un rapport texte (format Markdown simple : ## titres, - listes, **gras**)
+en fichiers Word (.docx) et PDF téléchargeables — avec une vraie mise en forme
+(le **gras** Markdown devient du gras réel, pas des astérisques littéraux).
 """
 
 import io
+import re
+from xml.sax.saxutils import escape
 from docx import Document
-from docx.shared import Pt, RGBColor
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+
+BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 
 
 def _parse_lines(report_text):
@@ -30,20 +34,45 @@ def _parse_lines(report_text):
     return parsed
 
 
+def _add_runs_docx(paragraph, text):
+    """Ajoute le texte à un paragraphe Word en convertissant **gras** en runs réellement en gras."""
+    pos = 0
+    for m in BOLD_PATTERN.finditer(text):
+        if m.start() > pos:
+            paragraph.add_run(text[pos:m.start()])
+        run = paragraph.add_run(m.group(1))
+        run.bold = True
+        pos = m.end()
+    if pos < len(text):
+        paragraph.add_run(text[pos:])
+
+
+def _strip_bold_markers(text):
+    """Pour les titres : retire les ** sans les convertir (les titres sont déjà en gras par leur style)."""
+    return BOLD_PATTERN.sub(r"\1", text)
+
+
+def _to_reportlab_markup(text):
+    """Échappe le texte puis convertit **gras** en balises <b> reconnues par reportlab."""
+    escaped = escape(text)
+    return BOLD_PATTERN.sub(r"<b>\1</b>", escaped)
+
+
 def export_to_docx(report_text: str, projet_nom: str) -> bytes:
     doc = Document()
-
-    title = doc.add_heading(f"Rapport d'exécution — {projet_nom}", level=0)
+    doc.add_heading(f"Rapport d'exécution — {projet_nom}", level=0)
 
     for kind, text in _parse_lines(report_text):
         if kind == "h1":
-            doc.add_heading(text, level=1)
+            doc.add_heading(_strip_bold_markers(text), level=1)
         elif kind == "h2":
-            doc.add_heading(text, level=2)
+            doc.add_heading(_strip_bold_markers(text), level=2)
         elif kind == "bullet":
-            doc.add_paragraph(text, style="List Bullet")
+            p = doc.add_paragraph(style="List Bullet")
+            _add_runs_docx(p, text)
         else:
-            doc.add_paragraph(text)
+            p = doc.add_paragraph()
+            _add_runs_docx(p, text)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -62,15 +91,15 @@ def export_to_pdf(report_text: str, projet_nom: str) -> bytes:
     bullet_style = ParagraphStyle("BulletCustom", parent=styles["Normal"], leftIndent=14, spaceAfter=4)
     normal_style = ParagraphStyle("NormalCustom", parent=styles["Normal"], spaceAfter=6)
 
-    story = [Paragraph(f"Rapport d'exécution — {projet_nom}", title_style), Spacer(1, 6)]
+    story = [Paragraph(escape(f"Rapport d'exécution — {projet_nom}"), title_style), Spacer(1, 6)]
 
     for kind, text in _parse_lines(report_text):
         if kind in ("h1", "h2"):
-            story.append(Paragraph(text, h2_style))
+            story.append(Paragraph(escape(_strip_bold_markers(text)), h2_style))
         elif kind == "bullet":
-            story.append(Paragraph(f"• {text}", bullet_style))
+            story.append(Paragraph(f"• {_to_reportlab_markup(text)}", bullet_style))
         else:
-            story.append(Paragraph(text, normal_style))
+            story.append(Paragraph(_to_reportlab_markup(text), normal_style))
 
     doc.build(story)
     return buffer.getvalue()

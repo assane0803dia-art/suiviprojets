@@ -149,30 +149,31 @@ aucun chiffre, aucune date, aucun fait qui n'y figure pas).
 DONNÉES DU PROJET :
 {donnees}
 
-Structure attendue du rapport (utilise des titres Markdown ## et des listes à puces -) :
-## Résumé exécutif
-## Contexte
+Structure attendue du rapport — une section par ligne de titre ci-dessous, chacune
+suivie de son contenu en texte simple (aucun symbole de mise en forme, voir consignes) :
+Résumé exécutif
+Contexte
 (déduis le contexte à partir de la description du projet — reste factuel)
-## Problématique
+Problématique
 (le problème que le projet cherche à résoudre, déduit du contexte et des objectifs)
-## Objectifs
-## Résultats attendus
-## Activités réalisées
-## Indicateurs
-## Risques identifiés
-## Budget
-## Calendrier
-## Conclusion
-## Recommandations
+Objectifs
+Résultats attendus
+Activités réalisées
+Indicateurs
+Risques identifiés
+Budget
+Calendrier
+Conclusion
+Recommandations
 
 Consignes :
 - Si une section manque de données suffisantes (ex: pas de description fournie pour le
   Contexte), indique-le brièvement ("Non renseigné" ou équivalent) plutôt que d'inventer.
 - Reste factuel et professionnel, 500-800 mots au total.
-- N'utilise pas de tableaux Markdown, uniquement des paragraphes et des listes à puces.
-- N'utilise ni crochets [ ] ni mise en gras ** ** au fil du texte — écris les noms de
-  projet, d'objectifs, d'activités et de résultats en texte simple, sans ponctuation
-  ni symbole superflu autour."""
+- N'utilise AUCUN symbole de mise en forme Markdown : pas de #, pas de ##, pas de **,
+  pas de crochets [ ]. Écris chaque titre de section seul sur sa ligne, en texte simple
+  (comme dans la liste ci-dessus), suivi d'un saut de ligne puis du contenu.
+- Pour les listes, utilise un tiret simple "- " en début de ligne, rien d'autre."""
 
 
 def generate_recommendations(snapshot: ProjectSnapshot, risques: dict) -> str:

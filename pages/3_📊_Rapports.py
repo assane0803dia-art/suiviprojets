@@ -154,4 +154,4 @@ else:
                     st.rerun()
 
             if st.session_state.get(f"show_rap_{rap['id']}"):
-                st.markdown(rap["contenu"])
+                st.markdown(report_export.to_display_markdown(rap["contenu"]))

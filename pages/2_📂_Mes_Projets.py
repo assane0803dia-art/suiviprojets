@@ -417,7 +417,7 @@ else:
                     with col1:
                         badge_kind = "muted" if obj["type_objectif"] == "Général" else "success"
                         st.markdown(
-                            f"{badge_html(obj['type_objectif'], badge_kind)} **{obj['titre']}**",
+                            f"{badge_html(obj['type_objectif'], badge_kind)} <b>{obj['titre'].strip()}</b>",
                             unsafe_allow_html=True,
                         )
                     with col2:
@@ -1085,3 +1085,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

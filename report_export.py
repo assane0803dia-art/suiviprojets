@@ -16,8 +16,17 @@ from reportlab.lib.units import cm
 BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 
 
+SECTION_TITRES = {
+    "résumé exécutif", "contexte", "problématique", "objectifs", "résultats attendus",
+    "activités réalisées", "indicateurs", "risques identifiés", "budget", "calendrier",
+    "conclusion", "recommandations",
+}
+
+
 def _parse_lines(report_text):
-    """Découpe le rapport en lignes typées : (type, texte) où type est 'h2', 'bullet' ou 'p'."""
+    """Découpe le rapport en lignes typées : (type, texte) où type est 'h2', 'bullet' ou 'p'.
+    Reconnaît aussi bien l'ancien format Markdown (## titres) que le format en texte
+    simple actuel (titre de section seul sur sa ligne, sans symbole)."""
     parsed = []
     for raw_line in report_text.split("\n"):
         line = raw_line.strip()
@@ -29,6 +38,8 @@ def _parse_lines(report_text):
             parsed.append(("h1", line[2:].strip()))
         elif line.startswith("- ") or line.startswith("• "):
             parsed.append(("bullet", line[2:].strip()))
+        elif line.lower().rstrip(" :") in SECTION_TITRES:
+            parsed.append(("h2", line.rstrip(" :")))
         else:
             parsed.append(("p", line))
     return parsed
@@ -56,6 +67,22 @@ def _to_reportlab_markup(text):
     """Échappe le texte puis convertit **gras** en balises <b> reconnues par reportlab."""
     escaped = escape(text)
     return BOLD_PATTERN.sub(r"<b>\1</b>", escaped)
+
+
+def to_display_markdown(text: str) -> str:
+    """
+    Reconstruit un minimum de Markdown (titres) à partir du texte simple stocké,
+    uniquement pour un rendu plus lisible à l'écran (st.markdown) — n'affecte jamais
+    le contenu réellement stocké ni exporté.
+    """
+    lines = []
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if line.lower().rstrip(" :") in SECTION_TITRES:
+            lines.append(f"#### {line}")
+        else:
+            lines.append(raw_line)
+    return "\n".join(lines)
 
 
 def export_to_docx(report_text: str, projet_nom: str) -> bytes:

@@ -415,7 +415,11 @@ else:
                 with st.container(border=True):
                     col1, col2, col3 = st.columns([3, 2, 1.2])
                     with col1:
-                        st.markdown(f"**[{obj['type_objectif']}] {obj['titre']}**")
+                        badge_kind = "muted" if obj["type_objectif"] == "Général" else "success"
+                        st.markdown(
+                            f"{badge_html(obj['type_objectif'], badge_kind)} **{obj['titre']}**",
+                            unsafe_allow_html=True,
+                        )
                     with col2:
                         st.caption(obj["responsable"] or "Sans responsable")
                     with col3:
@@ -1081,4 +1085,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

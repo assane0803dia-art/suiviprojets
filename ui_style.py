@@ -96,6 +96,10 @@ def inject_global_style():
             [data-testid="stContainer"] {{ transition: box-shadow 0.15s ease; }}
 
             [data-testid="stSidebar"] .stCaption {{ color: {MUTED}; }}
+
+            [data-testid="stMetricValue"] {{ font-size: 1.4rem; }}
+            [data-testid="stMetricLabel"] {{ font-size: 0.8rem; }}
+            [data-testid="stMetricDelta"] {{ font-size: 0.8rem; }}
         </style>
         """,
         unsafe_allow_html=True,

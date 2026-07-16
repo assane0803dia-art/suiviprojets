@@ -52,6 +52,47 @@ def create_utilisateur(nom, email, role):
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
 
 
+def update_utilisateur(id, nom, email, role):
+    try:
+        run_execute(
+            "UPDATE Utilisateurs SET nom=%s, email=%s, role=%s WHERE id=%s",
+            (nom, email, role, id),
+        )
+        get_utilisateurs.clear()
+    except psycopg2.errors.UniqueViolation:
+        raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
+
+
+def delete_utilisateur(id):
+    """Détache ce responsable de tout ce qu'il gérait avant de le supprimer
+    (les projets/objectifs/activités/tâches concernés passent en 'Aucun responsable')."""
+    run_execute("UPDATE Projets SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("UPDATE Objectifs SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("UPDATE Activites SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("UPDATE Taches SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("DELETE FROM Utilisateurs WHERE id=%s", (id,))
+    get_utilisateurs.clear()
+
+
+def update_utilisateur(id, nom, email, role):
+    try:
+        run_execute("UPDATE Utilisateurs SET nom=%s, email=%s, role=%s WHERE id=%s", (nom, email, role, id))
+        get_utilisateurs.clear()
+    except psycopg2.errors.UniqueViolation:
+        raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
+
+
+def delete_utilisateur(id):
+    """Supprime un responsable, en détachant proprement toutes ses affectations existantes
+    (projets, objectifs, activités, tâches) plutôt que de bloquer sur une contrainte."""
+    run_execute("UPDATE Projets SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("UPDATE Objectifs SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("UPDATE Activites SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("UPDATE Taches SET responsable_id=NULL WHERE responsable_id=%s", (id,))
+    run_execute("DELETE FROM Utilisateurs WHERE id=%s", (id,))
+    get_utilisateurs.clear()
+
+
 # ----------------------------------------------------------------------------
 # Projets
 # ----------------------------------------------------------------------------
@@ -147,26 +188,31 @@ def delete_objectif(id):
 # ----------------------------------------------------------------------------
 def get_resultats(objectif_id):
     return run_query("""
-        SELECT id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut
+        SELECT id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
+               source_verification, baseline
         FROM Resultats
         WHERE objectif_id = %s
         ORDER BY titre
     """, params=(objectif_id,))
 
 
-def create_resultat(objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut):
+def create_resultat(objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
+                     source_verification=None, baseline=None):
     return run_execute(
-        "INSERT INTO Resultats (objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut),
+        "INSERT INTO Resultats (objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut, "
+        "source_verification, baseline) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
+         source_verification, baseline),
     )
 
 
-def update_resultat(id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut):
+def update_resultat(id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
+                     source_verification=None, baseline=None):
     run_execute(
-        "UPDATE Resultats SET titre=%s, description=%s, indicateur=%s, valeur_cible=%s, valeur_actuelle=%s, unite=%s, statut=%s "
-        "WHERE id=%s",
-        (titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut, id),
+        "UPDATE Resultats SET titre=%s, description=%s, indicateur=%s, valeur_cible=%s, valeur_actuelle=%s, unite=%s, "
+        "statut=%s, source_verification=%s, baseline=%s WHERE id=%s",
+        (titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
+         source_verification, baseline, id),
     )
 
 
@@ -210,6 +256,7 @@ def update_activite(id, titre, description, responsable_id, date_debut, date_fin
 
 def delete_activite(id):
     run_execute("DELETE FROM Taches WHERE activite_id=%s", (id,))
+    run_execute("DELETE FROM Depenses WHERE activite_id=%s", (id,))
     run_execute("DELETE FROM Activites WHERE id=%s", (id,))
 
 
@@ -254,7 +301,7 @@ def delete_tache(id):
 def get_resultats_by_projet(projet_id):
     return run_query("""
         SELECT R.id, R.titre, R.description, R.indicateur, R.valeur_cible, R.valeur_actuelle, R.unite, R.statut,
-               R.objectif_id, O.titre AS objectif_titre
+               R.source_verification, R.baseline, R.objectif_id, O.titre AS objectif_titre
         FROM Resultats R
         JOIN Objectifs O ON R.objectif_id = O.id
         WHERE O.projet_id = %s
@@ -336,15 +383,15 @@ def update_resultat_valeur_actuelle(id, valeur_actuelle):
 # ----------------------------------------------------------------------------
 def get_indicateurs_supplementaires(resultat_id):
     return run_query(
-        "SELECT id, nom, valeur_cible, valeur_actuelle, unite FROM Indicateurs_Supplementaires "
-        "WHERE resultat_id = %s ORDER BY date_ajout",
+        "SELECT id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification "
+        "FROM Indicateurs_Supplementaires WHERE resultat_id = %s ORDER BY date_ajout",
         params=(resultat_id,),
     )
 
 
 def get_indicateurs_supplementaires_by_projet(projet_id):
     return run_query(
-        """SELECT I.id, I.nom, I.valeur_cible, I.valeur_actuelle, I.unite,
+        """SELECT I.id, I.nom, I.valeur_cible, I.valeur_actuelle, I.unite, I.baseline, I.source_verification,
                   R.titre AS resultat_titre, O.titre AS objectif_titre
            FROM Indicateurs_Supplementaires I
            JOIN Resultats R ON I.resultat_id = R.id
@@ -382,7 +429,7 @@ def export_objectifs():
 def export_resultats():
     return run_query("""
         SELECT R.id AS resultat_id, O.projet_id, R.objectif_id, R.titre, R.indicateur,
-               R.valeur_cible, R.valeur_actuelle, R.unite, R.statut
+               R.valeur_cible, R.valeur_actuelle, R.unite, R.statut, R.baseline, R.source_verification
         FROM Resultats R
         JOIN Objectifs O ON R.objectif_id = O.id
         ORDER BY O.projet_id, R.id
@@ -417,7 +464,7 @@ def export_taches():
 def export_indicateurs():
     return run_query("""
         SELECT I.id AS indicateur_id, O.projet_id, I.resultat_id, I.nom,
-               I.valeur_cible, I.valeur_actuelle, I.unite
+               I.valeur_cible, I.valeur_actuelle, I.unite, I.baseline, I.source_verification
         FROM Indicateurs_Supplementaires I
         JOIN Resultats R ON I.resultat_id = R.id
         JOIN Objectifs O ON R.objectif_id = O.id
@@ -425,23 +472,72 @@ def export_indicateurs():
     """)
 
 
-def create_indicateur_supplementaire(resultat_id, nom, valeur_cible, valeur_actuelle, unite):
+def export_depenses():
+    return run_query("""
+        SELECT D.id AS depense_id, O.projet_id, D.activite_id, D.montant, D.date_depense, D.description
+        FROM Depenses D
+        JOIN Activites A ON D.activite_id = A.id
+        JOIN Resultats R ON A.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        ORDER BY O.projet_id, D.id
+    """)
+
+
+def create_indicateur_supplementaire(resultat_id, nom, valeur_cible, valeur_actuelle, unite, baseline=None, source_verification=None):
     return run_execute(
-        "INSERT INTO Indicateurs_Supplementaires (resultat_id, nom, valeur_cible, valeur_actuelle, unite) "
-        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-        (resultat_id, nom, valeur_cible, valeur_actuelle, unite),
+        "INSERT INTO Indicateurs_Supplementaires (resultat_id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (resultat_id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification),
     )
 
 
-def update_indicateur_supplementaire(id, nom, valeur_cible, valeur_actuelle, unite):
+def update_indicateur_supplementaire(id, nom, valeur_cible, valeur_actuelle, unite, baseline=None, source_verification=None):
     run_execute(
-        "UPDATE Indicateurs_Supplementaires SET nom=%s, valeur_cible=%s, valeur_actuelle=%s, unite=%s WHERE id=%s",
-        (nom, valeur_cible, valeur_actuelle, unite, id),
+        "UPDATE Indicateurs_Supplementaires SET nom=%s, valeur_cible=%s, valeur_actuelle=%s, unite=%s, "
+        "baseline=%s, source_verification=%s WHERE id=%s",
+        (nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification, id),
     )
 
 
 def delete_indicateur_supplementaire(id):
     run_execute("DELETE FROM Indicateurs_Supplementaires WHERE id=%s", (id,))
+
+
+# ----------------------------------------------------------------------------
+# Module financier — dépenses réelles, écarts, taux d'exécution budgétaire
+# ----------------------------------------------------------------------------
+def get_depenses(activite_id):
+    return run_query(
+        "SELECT id, montant, date_depense, description FROM Depenses "
+        "WHERE activite_id = %s ORDER BY date_depense DESC",
+        params=(activite_id,),
+    )
+
+
+def get_depenses_by_projet(projet_id):
+    return run_query(
+        """SELECT D.id, D.montant, D.date_depense, D.description,
+                  A.id AS activite_id, A.titre AS activite_titre, A.budget AS budget_prevu
+           FROM Depenses D
+           JOIN Activites A ON D.activite_id = A.id
+           JOIN Resultats R ON A.resultat_id = R.id
+           JOIN Objectifs O ON R.objectif_id = O.id
+           WHERE O.projet_id = %s
+           ORDER BY A.titre, D.date_depense""",
+        params=(projet_id,),
+    )
+
+
+def create_depense(activite_id, montant, date_depense, description):
+    return run_execute(
+        "INSERT INTO Depenses (activite_id, montant, date_depense, description) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (activite_id, montant, date_depense, description),
+    )
+
+
+def delete_depense(id):
+    run_execute("DELETE FROM Depenses WHERE id=%s", (id,))
 
 
 # ----------------------------------------------------------------------------

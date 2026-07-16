@@ -121,8 +121,9 @@ if not is_lecteur and st.session_state.get("confirm_delete_projet_id") == select
 st.write("")
 
 if not is_lecteur:
-    with st.expander("👥 Ajouter un responsable (chef de projet, gestionnaire, membre d'équipe)"):
+    with st.expander("👥 Gérer les responsables (chefs de projet, gestionnaires, membres d'équipe)"):
         with st.form("form_new_utilisateur", clear_on_submit=True):
+            st.markdown("**➕ Ajouter un responsable**")
             c1, c2, c3 = st.columns(3)
             nom_u = c1.text_input("Nom complet *")
             email_u = c2.text_input("Email")
@@ -133,10 +134,52 @@ if not is_lecteur:
                 else:
                     try:
                         crud.create_utilisateur(nom_u, email_u, role_u)
-                        st.success(f"✅ '{nom_u}' ajouté avec succès.")
+                        st.toast(f"✅ '{nom_u}' ajouté avec succès.")
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
+
+        st.divider()
+        st.markdown("**📋 Responsables existants**")
+        tous_responsables_df = crud.get_utilisateurs()
+
+        if tous_responsables_df.empty:
+            st.caption("Aucun responsable enregistré pour l'instant.")
+        else:
+            for _, resp in tous_responsables_df.iterrows():
+                rc1, rc2, rc3 = st.columns([3, 2, 1])
+                with rc1:
+                    st.write(f"**{resp['nom']}**")
+                with rc2:
+                    st.caption(f"{resp['email'] or '—'} — {resp['role'] or '—'}")
+                with rc3:
+                    if st.button("✏️", key=f"edit_resp_btn_{resp['id']}", use_container_width=True, help="Modifier / supprimer"):
+                        st.session_state["editing_resp_id"] = None if st.session_state.get("editing_resp_id") == resp["id"] else resp["id"]
+                        st.rerun()
+
+                if st.session_state.get("editing_resp_id") == resp["id"]:
+                    with st.form(f"form_edit_resp_{resp['id']}"):
+                        nom_edit_u = st.text_input("Nom complet *", value=resp["nom"])
+                        ec1, ec2 = st.columns(2)
+                        email_edit_u = ec1.text_input("Email", value=resp["email"] or "")
+                        role_edit_u = ec2.text_input("Rôle", value=resp["role"] or "")
+                        col_save_u, col_del_u = st.columns(2)
+                        if col_save_u.form_submit_button("💾 Enregistrer", use_container_width=True):
+                            if not nom_edit_u:
+                                st.warning("Le nom est obligatoire.")
+                            else:
+                                try:
+                                    crud.update_utilisateur(resp["id"], nom_edit_u, email_edit_u, role_edit_u)
+                                    st.toast("✅ Responsable mis à jour avec succès.")
+                                    st.session_state["editing_resp_id"] = None
+                                    st.rerun()
+                                except ValueError as e:
+                                    st.error(str(e))
+                        if col_del_u.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                            crud.delete_utilisateur(resp["id"])
+                            st.warning("Responsable supprimé (les éléments qu'il gérait passent en 'Aucun responsable').")
+                            st.session_state["editing_resp_id"] = None
+                            st.rerun()
 
     with st.expander("✏️ Modifier les informations du projet"):
         utilisateurs_df_edit = crud.get_utilisateurs()
@@ -337,15 +380,30 @@ if is_lecteur:
         tip("budget_fixe_variable", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
         budget_projet_ro = float(projet_row["budget"] or 0)
         budget_active_ro = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0
-        c1, c2 = st.columns(2)
+        depenses_projet_ro = crud.get_depenses_by_projet(selected_projet_id)
+        depense_reelle_ro = float(depenses_projet_ro["montant"].sum()) if not depenses_projet_ro.empty else 0.0
+        taux_execution_ro = (depense_reelle_ro / budget_active_ro * 100) if budget_active_ro else 0.0
+
+        c1, c2, c3 = st.columns(3)
         c1.metric("Budget global du projet", f"{budget_projet_ro:,.0f} FCFA".replace(",", " "))
-        c2.metric("Somme des budgets d'activités", f"{budget_active_ro:,.0f} FCFA".replace(",", " "))
+        c2.metric("Prévu (activités)", f"{budget_active_ro:,.0f} FCFA".replace(",", " "))
+        c3.metric("Dépensé réellement", f"{depense_reelle_ro:,.0f} FCFA".replace(",", " "), delta=f"{taux_execution_ro:.0f}% exécuté")
+
         if not activites_df.empty:
             st.write("")
             st.markdown("**Détail par activité**")
             st.dataframe(
                 activites_df[["resultat_titre", "titre", "budget"]].rename(
                     columns={"resultat_titre": "Résultat", "titre": "Activité", "budget": "Budget (FCFA)"}
+                ),
+                use_container_width=True, hide_index=True,
+            )
+        if not depenses_projet_ro.empty:
+            st.write("")
+            st.markdown("**Dépenses enregistrées**")
+            st.dataframe(
+                depenses_projet_ro[["activite_titre", "date_depense", "montant", "description"]].rename(
+                    columns={"activite_titre": "Activité", "date_depense": "Date", "montant": "Montant (FCFA)", "description": "Description"}
                 ),
                 use_container_width=True, hide_index=True,
             )
@@ -513,11 +571,14 @@ else:
                 c4, c5 = st.columns(2)
                 unite = c4.text_input("Unité", key="new_res_unite")
                 statut_r = c5.selectbox("Statut", crud.STATUTS_GENERIQUE, key="new_res_statut")
+                c6, c7 = st.columns(2)
+                baseline = c6.number_input("Baseline (valeur de départ)", key="new_res_baseline")
+                source_verification = c7.text_input("Source de vérification", key="new_res_source", placeholder="ex: rapport de terrain, enquête...")
                 if st.button("Ajouter", key="submit_new_resultat"):
                     if not titre_r:
                         st.warning("Le titre est obligatoire.")
                     else:
-                        crud.create_resultat(objectif_id, titre_r, description_r, indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
+                        crud.create_resultat(objectif_id, titre_r, description_r, indicateur, valeur_cible, valeur_actuelle, unite, statut_r, source_verification, baseline)
                         for k in ["new_res_titre", "new_res_description", "new_res_indicateur", "new_res_unite", "res_suggestions"]:
                             st.session_state.pop(k, None)
                         st.toast("✅ Résultat ajouté avec succès.")
@@ -542,6 +603,8 @@ else:
                         indicateurs_suppl = crud.get_indicateurs_supplementaires(res["id"])
                         with st.expander(f"📊 Indicateurs ({1 + len(indicateurs_suppl)})"):
                             st.caption(f"**Principal** — {res['indicateur'] or 'Sans nom'} : {res['valeur_actuelle']}/{res['valeur_cible']} {res['unite'] or ''} *(modifiable via « ✏️ Modifier » ci-dessus)*")
+                            if res["baseline"] or res["source_verification"]:
+                                st.caption(f"　　Baseline : {res['baseline'] if res['baseline'] is not None else '—'} · Source de vérification : {res['source_verification'] or '—'}")
 
                             for _, ind in indicateurs_suppl.iterrows():
                                 ic1, ic2, ic3 = st.columns([3, 1.5, 1])
@@ -561,12 +624,15 @@ else:
                                         cible_ind = jc1.number_input("Valeur cible", value=float(ind["valeur_cible"] or 0), key=f"cible_ind_{ind['id']}")
                                         actuelle_ind = jc2.number_input("Valeur actuelle", value=float(ind["valeur_actuelle"] or 0), key=f"actuelle_ind_{ind['id']}")
                                         unite_ind = jc3.text_input("Unité", value=ind["unite"] or "", key=f"unite_ind_{ind['id']}")
+                                        jc4, jc5 = st.columns(2)
+                                        baseline_ind = jc4.number_input("Baseline", value=float(ind["baseline"] or 0), key=f"baseline_ind_{ind['id']}")
+                                        source_ind = jc5.text_input("Source de vérification", value=ind["source_verification"] or "", key=f"source_ind_{ind['id']}")
                                         col_save_ind, col_del_ind = st.columns(2)
                                         if col_save_ind.form_submit_button("💾 Enregistrer", use_container_width=True):
                                             if not nom_ind:
                                                 st.warning("Le nom est obligatoire.")
                                             else:
-                                                crud.update_indicateur_supplementaire(ind["id"], nom_ind, cible_ind, actuelle_ind, unite_ind)
+                                                crud.update_indicateur_supplementaire(ind["id"], nom_ind, cible_ind, actuelle_ind, unite_ind, baseline_ind, source_ind)
                                                 st.toast("✅ Indicateur mis à jour avec succès.")
                                                 st.session_state["editing_ind_id"] = None
                                                 st.rerun()
@@ -584,11 +650,14 @@ else:
                                 cible_new_ind = kc1.number_input("Valeur cible", key=f"new_ind_cible_{res['id']}")
                                 actuelle_new_ind = kc2.number_input("Valeur actuelle", key=f"new_ind_actuelle_{res['id']}")
                                 unite_new_ind = kc3.text_input("Unité", key=f"new_ind_unite_{res['id']}")
+                                kc4, kc5 = st.columns(2)
+                                baseline_new_ind = kc4.number_input("Baseline", key=f"new_ind_baseline_{res['id']}")
+                                source_new_ind = kc5.text_input("Source de vérification", key=f"new_ind_source_{res['id']}")
                                 if st.form_submit_button("Ajouter un indicateur", use_container_width=True):
                                     if not nom_new_ind:
                                         st.warning("Le nom est obligatoire.")
                                     else:
-                                        crud.create_indicateur_supplementaire(res["id"], nom_new_ind, cible_new_ind, actuelle_new_ind, unite_new_ind)
+                                        crud.create_indicateur_supplementaire(res["id"], nom_new_ind, cible_new_ind, actuelle_new_ind, unite_new_ind, baseline_new_ind, source_new_ind)
                                         st.toast("✅ Indicateur ajouté avec succès.")
                                         st.rerun()
 
@@ -614,9 +683,12 @@ else:
                                     "Statut", crud.STATUTS_GENERIQUE,
                                     index=crud.STATUTS_GENERIQUE.index(res["statut"]) if res["statut"] in crud.STATUTS_GENERIQUE else 0,
                                 )
+                                c6, c7 = st.columns(2)
+                                baseline = c6.number_input("Baseline (valeur de départ)", value=float(res["baseline"] or 0))
+                                source_verification = c7.text_input("Source de vérification", value=res["source_verification"] or "")
                                 col_save, col_delete = st.columns(2)
                                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
-                                    crud.update_resultat(res["id"], titre_r, st.session_state[edit_key], indicateur, valeur_cible, valeur_actuelle, unite, statut_r)
+                                    crud.update_resultat(res["id"], titre_r, st.session_state[edit_key], indicateur, valeur_cible, valeur_actuelle, unite, statut_r, source_verification, baseline)
                                     st.toast("✅ Résultat mis à jour avec succès.")
                                     st.session_state["editing_res_id"] = None
                                     st.rerun()
@@ -945,13 +1017,21 @@ else:
 
         budget_projet = float(projet_row["budget"] or 0)
         budget_active = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0
+        depenses_projet_df = crud.get_depenses_by_projet(selected_projet_id)
+        depense_reelle_totale = float(depenses_projet_df["montant"].sum()) if not depenses_projet_df.empty else 0.0
+        ecart_total = budget_active - depense_reelle_totale
+        taux_execution_total = (depense_reelle_totale / budget_active * 100) if budget_active else 0.0
 
-        c1, c2 = st.columns(2)
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("Budget global du projet", f"{budget_projet:,.0f} FCFA".replace(",", " "))
-        c2.metric("Somme des budgets d'activités", f"{budget_active:,.0f} FCFA".replace(",", " "))
+        c2.metric("Prévu (activités)", f"{budget_active:,.0f} FCFA".replace(",", " "))
+        c3.metric("Dépensé réellement", f"{depense_reelle_totale:,.0f} FCFA".replace(",", " "))
+        c4.metric("Écart", f"{ecart_total:,.0f} FCFA".replace(",", " "), delta=f"{taux_execution_total:.0f}% exécuté", delta_color="inverse" if ecart_total < 0 else "normal")
 
         if budget_active > budget_projet and budget_projet > 0:
             st.warning("⚠️ La somme des budgets d'activités dépasse le budget global du projet.")
+        if depense_reelle_totale > budget_active and budget_active > 0:
+            st.warning("⚠️ Les dépenses réelles dépassent le budget prévu des activités — dépassement à surveiller.")
 
         with st.expander("✏️ Modifier le budget global du projet"):
             with st.form("form_edit_budget"):
@@ -965,15 +1045,53 @@ else:
                     st.toast("✅ Budget mis à jour avec succès.")
                     st.rerun()
 
-        if not activites_df.empty:
-            st.write("")
-            st.markdown("**Détail par activité**")
-            st.dataframe(
-                activites_df[["resultat_titre", "titre", "budget"]].rename(
-                    columns={"resultat_titre": "Résultat", "titre": "Activité", "budget": "Budget (FCFA)"}
-                ),
-                use_container_width=True, hide_index=True,
-            )
+        st.write("")
+        st.markdown("**📊 Exécution financière par activité**")
+
+        if activites_df.empty:
+            st.info("Aucune activité pour ce projet.")
+        else:
+            for _, act_budget in activites_df.iterrows():
+                depenses_act = depenses_projet_df[depenses_projet_df["activite_id"] == act_budget["id"]] if not depenses_projet_df.empty else pd.DataFrame()
+                budget_prevu_act = float(act_budget["budget"] or 0)
+                depense_act = float(depenses_act["montant"].sum()) if not depenses_act.empty else 0.0
+                ecart_act = budget_prevu_act - depense_act
+                taux_act = (depense_act / budget_prevu_act * 100) if budget_prevu_act else 0.0
+
+                with st.expander(f"{act_budget['titre']} — {taux_act:.0f}% exécuté"):
+                    fc1, fc2, fc3 = st.columns(3)
+                    fc1.metric("Prévu", f"{budget_prevu_act:,.0f} FCFA".replace(",", " "))
+                    fc2.metric("Dépensé", f"{depense_act:,.0f} FCFA".replace(",", " "))
+                    fc3.metric("Écart", f"{ecart_act:,.0f} FCFA".replace(",", " "))
+
+                    if not depenses_act.empty:
+                        st.dataframe(
+                            depenses_act[["date_depense", "montant", "description"]].rename(
+                                columns={"date_depense": "Date", "montant": "Montant (FCFA)", "description": "Description"}
+                            ),
+                            use_container_width=True, hide_index=True,
+                        )
+                        for _, dep in depenses_act.iterrows():
+                            if st.button("🗑️ Supprimer cette dépense", key=f"del_dep_{dep['id']}"):
+                                crud.delete_depense(dep["id"])
+                                st.toast("✅ Dépense supprimée avec succès.")
+                                st.rerun()
+                    else:
+                        st.caption("Aucune dépense enregistrée pour cette activité.")
+
+                    with st.form(f"form_new_depense_{act_budget['id']}", clear_on_submit=True):
+                        st.caption("➕ Enregistrer une dépense")
+                        dc1, dc2 = st.columns(2)
+                        montant_dep = dc1.number_input("Montant (FCFA)", min_value=0.0, step=1000.0)
+                        date_dep = dc2.date_input("Date de la dépense", value=None)
+                        desc_dep = st.text_input("Description")
+                        if st.form_submit_button("Ajouter la dépense", use_container_width=True):
+                            if montant_dep <= 0:
+                                st.warning("Le montant doit être supérieur à 0.")
+                            else:
+                                crud.create_depense(act_budget["id"], montant_dep, date_dep, desc_dep)
+                                st.toast("✅ Dépense enregistrée avec succès.")
+                                st.rerun()
 
     # ==============================================================================
     # SECTION : PARTIES PRENANTES

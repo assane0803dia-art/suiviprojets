@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import pandas as pd
 from auth import require_login, logout_button
 import auth
 from ui_style import sidebar_brand, section_title, badge_html, tip, ai_text_field
@@ -1203,4 +1204,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

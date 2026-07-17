@@ -34,50 +34,29 @@ def run_execute(query, params=None):
 # ----------------------------------------------------------------------------
 # Utilisateurs (responsables)
 # ----------------------------------------------------------------------------
-@st.cache_data(ttl=30)
-def get_utilisateurs():
-    return run_query("SELECT id, nom, email, role FROM Utilisateurs ORDER BY nom")
+def get_utilisateurs(projet_id):
+    """Responsables rattachés à un projet précis uniquement — chaque projet a sa
+    propre liste, pour garantir l'indépendance entre projets."""
+    return run_query(
+        "SELECT id, nom, email, role FROM Utilisateurs WHERE projet_id = %s ORDER BY nom",
+        params=(projet_id,),
+    )
 
 
-def create_utilisateur(nom, email, role):
+def create_utilisateur(nom, email, role, projet_id):
     try:
-        new_id = run_execute(
-            "INSERT INTO Utilisateurs (nom, email, mot_de_passe, role, date_creation) "
-            "VALUES (%s, %s, '', %s, NOW()) RETURNING id",
-            (nom, email, role),
+        return run_execute(
+            "INSERT INTO Utilisateurs (nom, email, mot_de_passe, role, projet_id, date_creation) "
+            "VALUES (%s, %s, '', %s, %s, NOW()) RETURNING id",
+            (nom, email, role, projet_id),
         )
-        get_utilisateurs.clear()
-        return new_id
     except psycopg2.errors.UniqueViolation:
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
-
-
-def update_utilisateur(id, nom, email, role):
-    try:
-        run_execute(
-            "UPDATE Utilisateurs SET nom=%s, email=%s, role=%s WHERE id=%s",
-            (nom, email, role, id),
-        )
-        get_utilisateurs.clear()
-    except psycopg2.errors.UniqueViolation:
-        raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
-
-
-def delete_utilisateur(id):
-    """Détache ce responsable de tout ce qu'il gérait avant de le supprimer
-    (les projets/objectifs/activités/tâches concernés passent en 'Aucun responsable')."""
-    run_execute("UPDATE Projets SET responsable_id=NULL WHERE responsable_id=%s", (id,))
-    run_execute("UPDATE Objectifs SET responsable_id=NULL WHERE responsable_id=%s", (id,))
-    run_execute("UPDATE Activites SET responsable_id=NULL WHERE responsable_id=%s", (id,))
-    run_execute("UPDATE Taches SET responsable_id=NULL WHERE responsable_id=%s", (id,))
-    run_execute("DELETE FROM Utilisateurs WHERE id=%s", (id,))
-    get_utilisateurs.clear()
 
 
 def update_utilisateur(id, nom, email, role):
     try:
         run_execute("UPDATE Utilisateurs SET nom=%s, email=%s, role=%s WHERE id=%s", (nom, email, role, id))
-        get_utilisateurs.clear()
     except psycopg2.errors.UniqueViolation:
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
 
@@ -90,7 +69,6 @@ def delete_utilisateur(id):
     run_execute("UPDATE Activites SET responsable_id=NULL WHERE responsable_id=%s", (id,))
     run_execute("UPDATE Taches SET responsable_id=NULL WHERE responsable_id=%s", (id,))
     run_execute("DELETE FROM Utilisateurs WHERE id=%s", (id,))
-    get_utilisateurs.clear()
 
 
 # ----------------------------------------------------------------------------

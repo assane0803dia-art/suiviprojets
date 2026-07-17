@@ -70,7 +70,7 @@ if "hub_active_section" not in st.session_state:
 
 
 def responsable_options():
-    df = crud.get_utilisateurs()
+    df = crud.get_utilisateurs(selected_projet_id)
     options = {None: "— Aucun —"}
     for _, row in df.iterrows():
         options[row["id"]] = row["nom"]
@@ -134,18 +134,19 @@ if not is_lecteur:
                     st.warning("Le nom est obligatoire.")
                 else:
                     try:
-                        crud.create_utilisateur(nom_u, email_u, role_u)
+                        crud.create_utilisateur(nom_u, email_u, role_u, selected_projet_id)
                         st.toast(f"✅ '{nom_u}' ajouté avec succès.")
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
 
         st.divider()
-        st.markdown("**📋 Responsables existants**")
-        tous_responsables_df = crud.get_utilisateurs()
+        st.markdown(f"**📋 Responsables de « {projet_row['nom']} »**")
+        st.caption("Chaque projet a sa propre liste de responsables, indépendante des autres projets.")
+        tous_responsables_df = crud.get_utilisateurs(selected_projet_id)
 
         if tous_responsables_df.empty:
-            st.caption("Aucun responsable enregistré pour l'instant.")
+            st.caption("Aucun responsable enregistré pour ce projet pour l'instant.")
         else:
             for _, resp in tous_responsables_df.iterrows():
                 rc1, rc2, rc3 = st.columns([3, 2, 1])
@@ -183,7 +184,7 @@ if not is_lecteur:
                             st.rerun()
 
     with st.expander("✏️ Modifier les informations du projet"):
-        utilisateurs_df_edit = crud.get_utilisateurs()
+        utilisateurs_df_edit = crud.get_utilisateurs(selected_projet_id)
         resp_options_edit = {None: "— Aucun —"}
         for _, row in utilisateurs_df_edit.iterrows():
             resp_options_edit[row["id"]] = row["nom"]

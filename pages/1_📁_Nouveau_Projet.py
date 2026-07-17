@@ -21,11 +21,9 @@ description = ai_text_field("Description", key="new_projet_description", context
 
 st.write("")
 section_title("👥", "Responsable du projet")
+st.caption("Un nouveau projet démarre sans responsable réutilisé d'un autre projet — chaque projet a sa propre liste.")
 
-utilisateurs_df = crud.get_utilisateurs()
 resp_options = {None: "— Aucun —", "__new__": "➕ Ajouter un nouveau responsable"}
-for _, row in utilisateurs_df.iterrows():
-    resp_options[row["id"]] = row["nom"]
 
 responsable_choice = st.selectbox(
     "Responsable du projet", options=list(resp_options.keys()),
@@ -34,7 +32,7 @@ responsable_choice = st.selectbox(
 
 nouveau_resp_nom = nouveau_resp_email = nouveau_resp_role = None
 if responsable_choice == "__new__":
-    st.caption("Ce responsable n'existe pas encore — renseignez ses informations, il sera créé en même temps que le projet :")
+    st.caption("Renseignez les informations de ce responsable, il sera créé en même temps que le projet :")
     rc1, rc2, rc3 = st.columns(3)
     nouveau_resp_nom = rc1.text_input("Nom complet *", key="new_resp_nom")
     nouveau_resp_email = rc2.text_input("Email", key="new_resp_email")
@@ -58,12 +56,13 @@ with st.form("form_new_projet_quick"):
             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
         else:
             try:
-                if responsable_choice == "__new__":
-                    final_responsable_id = crud.create_utilisateur(nouveau_resp_nom, nouveau_resp_email, nouveau_resp_role)
-                else:
-                    final_responsable_id = responsable_choice
+                # Le projet doit exister avant de pouvoir y rattacher un responsable
+                new_id = crud.create_projet(nom, description, date_debut, date_fin, budget, statut, None)
 
-                new_id = crud.create_projet(nom, description, date_debut, date_fin, budget, statut, final_responsable_id)
+                if responsable_choice == "__new__":
+                    final_responsable_id = crud.create_utilisateur(nouveau_resp_nom, nouveau_resp_email, nouveau_resp_role, new_id)
+                    crud.update_projet(new_id, nom, description, date_debut, date_fin, budget, statut, final_responsable_id)
+
                 st.session_state["jump_to_projet_id"] = new_id
                 for k in ["new_projet_nom", "new_projet_description", "new_resp_nom", "new_resp_email", "new_resp_role"]:
                     st.session_state.pop(k, None)

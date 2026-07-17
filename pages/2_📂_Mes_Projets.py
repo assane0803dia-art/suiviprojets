@@ -247,7 +247,7 @@ nb_indicateurs_principaux = len(resultats_df[resultats_df["indicateur"].notna() 
 nb_indicateurs_suppl = len(crud.get_indicateurs_supplementaires_by_projet(selected_projet_id))
 
 cards = [
-    ("objectifs", "🎯", "Objectifs spécifiques", len(objectifs_df)),
+    ("objectifs", "🎯", "Objectifs (Général et Spécifiques)", len(objectifs_df)),
     ("resultats", "📈", "Résultats attendus", len(resultats_df)),
     ("activites", "📅", "Activités", len(activites_df)),
     ("taches", "✅", "Tâches", len(taches_df)),
@@ -318,7 +318,7 @@ st.divider()
 # ==============================================================================
 if is_lecteur:
     if active == "objectifs":
-        section_title("🎯", "Objectifs spécifiques", ui_style.SECTION_HELP["objectifs"])
+        section_title("🎯", "Objectifs (Général et Spécifiques)", ui_style.SECTION_HELP["objectifs"])
         tip("objectifs_smart", "Utilisez des objectifs SMART : Spécifiques, Mesurables, Atteignables, Réalistes, Temporellement définis.")
         if objectifs_df.empty:
             st.info("Aucun objectif pour ce projet.")
@@ -454,7 +454,7 @@ if is_lecteur:
 
 else:
     if active == "objectifs":
-        section_title("🎯", "Objectifs spécifiques", ui_style.SECTION_HELP["objectifs"])
+        section_title("🎯", "Objectifs (Général et Spécifiques)", ui_style.SECTION_HELP["objectifs"])
         tip("objectifs_smart_2", "Utilisez des objectifs SMART : Spécifiques, Mesurables, Atteignables, Réalistes, Temporellement définis.")
 
         with st.expander("➕ Ajouter un objectif"):
@@ -1213,4 +1213,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

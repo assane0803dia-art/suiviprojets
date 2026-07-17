@@ -787,10 +787,20 @@ else:
                                 date_fin_a = c2.date_input("Date de fin", value=act["date_fin"])
                                 c3, c4 = st.columns(2)
                                 budget_a = c3.number_input("Budget (FCFA)", min_value=0.0, value=float(act["budget"] or 0))
-                                progression_a = c4.slider("Progression (%)", 0, 100, int(act["progression"] or 0))
+
+                                a_des_taches = not taches_df[taches_df["activite_id"] == act["id"]].empty if not taches_df.empty else False
+                                progression_a = c4.slider(
+                                    "Progression (%)", 0, 100, int(act["progression"] or 0),
+                                    disabled=a_des_taches,
+                                    help="Calculée automatiquement à partir des tâches de cette activité." if a_des_taches else None,
+                                )
+                                if a_des_taches:
+                                    st.caption("🔒 Cette activité a des tâches — sa progression est calculée automatiquement à partir d'elles (moyenne de leur avancement, « Terminé » seulement si toutes le sont).")
+
                                 statut_a = st.selectbox(
                                     "Statut", crud.STATUTS_GENERIQUE,
                                     index=crud.STATUTS_GENERIQUE.index(act["statut"]) if act["statut"] in crud.STATUTS_GENERIQUE else 0,
+                                    disabled=a_des_taches,
                                 )
                                 resp_options = responsable_options()
                                 current_resp = act["responsable_id"] if act["responsable_id"] in resp_options else None
@@ -803,7 +813,11 @@ else:
                                     if not validators.dates_valides(date_debut_a, date_fin_a):
                                         st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
                                     else:
-                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
+                                        # Si l'activité a des tâches, on garde la progression/le statut déjà
+                                        # calculés automatiquement plutôt que d'écraser avec les champs désactivés.
+                                        progression_finale = float(act["progression"] or 0) if a_des_taches else progression_a
+                                        statut_final = act["statut"] if a_des_taches else statut_a
+                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_final, budget_a, progression_finale)
                                         st.toast("✅ Activité mise à jour avec succès.")
                                         st.session_state["editing_act_id"] = None
                                         st.rerun()
@@ -854,6 +868,7 @@ else:
                                     activite_id, sugg.get("titre", ""), sugg.get("description", ""),
                                     None, "Moyenne", "À faire", None, None, 0,
                                 )
+                                crud.recalculate_activite_progression(activite_id)
                                 st.toast("✅ Tâche ajoutée avec succès.")
                                 st.rerun()
 
@@ -883,6 +898,7 @@ else:
                         )
                     else:
                         crud.create_tache(activite_id, titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
+                        crud.recalculate_activite_progression(activite_id)
                         for k in ["new_tache_titre", "new_tache_description", "new_tache_debut", "new_tache_fin", "new_tache_progression", "tache_suggestions"]:
                             st.session_state.pop(k, None)
                         st.toast("✅ Tâche ajoutée avec succès.")
@@ -942,11 +958,13 @@ else:
                                         )
                                     else:
                                         crud.update_tache(tache["id"], titre_t, description_t, responsable_id_t, priorite_t, statut_t, date_debut_t, date_fin_t, progression_t)
+                                        crud.recalculate_activite_progression(tache["activite_id"])
                                         st.toast("✅ Tâche mise à jour avec succès.")
                                         st.session_state["editing_tache_id"] = None
                                         st.rerun()
                                 if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                                     crud.delete_tache(tache["id"])
+                                    crud.recalculate_activite_progression(tache["activite_id"])
                                     st.warning("Tâche supprimée.")
                                     st.session_state["editing_tache_id"] = None
                                     st.rerun()
@@ -1201,3 +1219,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

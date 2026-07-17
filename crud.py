@@ -272,6 +272,47 @@ def delete_tache(id):
     run_execute("DELETE FROM Taches WHERE id=%s", (id,))
 
 
+def recalculate_activite_progression(activite_id):
+    """
+    Recalcule automatiquement la progression et le statut d'une activité à partir
+    de ses tâches : progression = moyenne des progressions des tâches, et l'activité
+    passe à "Terminé" seulement si TOUTES ses tâches le sont.
+
+    Si l'activité n'a aucune tâche, rien n'est recalculé : la valeur reste celle
+    saisie manuellement — c'est la seule mesure pertinente possible sans données
+    à agréger.
+
+    Un statut "Bloqué" positionné manuellement est préservé (pas écrasé par le calcul
+    automatique), car il signale un blocage indépendant de l'avancement des tâches.
+    """
+    taches_df = run_query(
+        "SELECT statut, progression FROM Taches WHERE activite_id = %s",
+        params=(activite_id,),
+    )
+    if taches_df.empty:
+        return
+
+    moyenne = float(taches_df["progression"].fillna(0).mean())
+    toutes_terminees = bool((taches_df["statut"] == "Terminé").all())
+
+    activite_actuelle = run_query("SELECT statut FROM Activites WHERE id = %s", params=(activite_id,))
+    statut_actuel = activite_actuelle.iloc[0]["statut"] if not activite_actuelle.empty else None
+
+    if toutes_terminees:
+        nouveau_statut, moyenne = "Terminé", 100.0
+    elif statut_actuel == "Bloqué":
+        nouveau_statut = "Bloqué"
+    elif moyenne > 0:
+        nouveau_statut = "En cours"
+    else:
+        nouveau_statut = "À faire"
+
+    run_execute(
+        "UPDATE Activites SET progression=%s, statut=%s WHERE id=%s",
+        (moyenne, nouveau_statut, activite_id),
+    )
+
+
 # ----------------------------------------------------------------------------
 # Vues "à plat" — tous les éléments d'un projet, indépendamment de leur parent
 # (nécessaires pour un accès direct par section, sans ordre imposé)

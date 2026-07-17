@@ -188,9 +188,17 @@ if not is_lecteur:
         for _, row in utilisateurs_df_edit.iterrows():
             resp_options_edit[row["id"]] = row["nom"]
 
+        edit_projet_desc_key = f"edit_projet_description_{selected_projet_id}"
+        if edit_projet_desc_key not in st.session_state:
+            st.session_state[edit_projet_desc_key] = projet_row["description"] or ""
+
+        nom_edit = st.text_input("Nom du projet *", value=projet_row["nom"], key=f"edit_projet_nom_{selected_projet_id}")
+        description_edit = ai_text_field(
+            "Description", key=edit_projet_desc_key,
+            contexte=f"Nom du projet : {nom_edit}",
+        )
+
         with st.form("form_edit_projet_info"):
-            nom_edit = st.text_input("Nom du projet *", value=projet_row["nom"])
-            description_edit = st.text_area("Description", value=projet_row["description"] or "")
             c1, c2 = st.columns(2)
             date_debut_edit = c1.date_input("Date de début", value=projet_row["date_debut"])
             date_fin_edit = c2.date_input("Date de fin", value=projet_row["date_fin"])
@@ -214,7 +222,7 @@ if not is_lecteur:
                 else:
                     try:
                         crud.update_projet(
-                            selected_projet_id, nom_edit, description_edit, date_debut_edit, date_fin_edit,
+                            selected_projet_id, nom_edit, st.session_state[edit_projet_desc_key], date_debut_edit, date_fin_edit,
                             float(projet_row["budget"] or 0), statut_edit, responsable_id_edit,
                         )
                         st.toast("✅ Projet mis à jour avec succès.")
@@ -1204,3 +1212,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

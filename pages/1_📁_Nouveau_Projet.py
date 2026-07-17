@@ -19,6 +19,27 @@ tip("nouveau_projet_contexte", "Décrivez brièvement le problème auquel votre 
 nom = st.text_input("Nom du projet *", key="new_projet_nom")
 description = ai_text_field("Description", key="new_projet_description", contexte=f"Nom du projet : {nom}" if nom else "")
 
+st.write("")
+section_title("👥", "Responsable du projet")
+
+utilisateurs_df = crud.get_utilisateurs()
+resp_options = {None: "— Aucun —", "__new__": "➕ Ajouter un nouveau responsable"}
+for _, row in utilisateurs_df.iterrows():
+    resp_options[row["id"]] = row["nom"]
+
+responsable_choice = st.selectbox(
+    "Responsable du projet", options=list(resp_options.keys()),
+    format_func=lambda x: resp_options[x], key="new_projet_responsable_choice",
+)
+
+nouveau_resp_nom = nouveau_resp_email = nouveau_resp_role = None
+if responsable_choice == "__new__":
+    st.caption("Ce responsable n'existe pas encore — renseignez ses informations, il sera créé en même temps que le projet :")
+    rc1, rc2, rc3 = st.columns(3)
+    nouveau_resp_nom = rc1.text_input("Nom complet *", key="new_resp_nom")
+    nouveau_resp_email = rc2.text_input("Email", key="new_resp_email")
+    nouveau_resp_role = rc3.text_input("Fonction (ex: Chef de projet)", key="new_resp_role")
+
 with st.form("form_new_projet_quick"):
     with st.expander("➕ Informations complémentaires (facultatif — modifiable plus tard)"):
         c1, c2 = st.columns(2)
@@ -27,26 +48,25 @@ with st.form("form_new_projet_quick"):
         c3, c4 = st.columns(2)
         budget = c3.number_input("Budget (FCFA)", min_value=0.0, step=100000.0)
         statut = c4.selectbox("Statut", crud.STATUTS_PROJET)
-        utilisateurs_df = crud.get_utilisateurs()
-        resp_options = {None: "— Aucun —"}
-        for _, row in utilisateurs_df.iterrows():
-            resp_options[row["id"]] = row["nom"]
-        responsable_id = st.selectbox(
-            "Responsable du projet", options=list(resp_options.keys()),
-            format_func=lambda x: resp_options[x],
-        )
 
     if st.form_submit_button("✅ Créer le projet", use_container_width=True, type="primary"):
         if not nom:
             st.warning("Le nom du projet est obligatoire.")
+        elif responsable_choice == "__new__" and not nouveau_resp_nom:
+            st.warning("Le nom du nouveau responsable est obligatoire (ou choisissez « — Aucun — »).")
         elif not validators.dates_valides(date_debut, date_fin):
             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
         else:
             try:
-                new_id = crud.create_projet(nom, description, date_debut, date_fin, budget, statut, responsable_id)
+                if responsable_choice == "__new__":
+                    final_responsable_id = crud.create_utilisateur(nouveau_resp_nom, nouveau_resp_email, nouveau_resp_role)
+                else:
+                    final_responsable_id = responsable_choice
+
+                new_id = crud.create_projet(nom, description, date_debut, date_fin, budget, statut, final_responsable_id)
                 st.session_state["jump_to_projet_id"] = new_id
-                st.session_state.pop("new_projet_nom", None)
-                st.session_state.pop("new_projet_description", None)
+                for k in ["new_projet_nom", "new_projet_description", "new_resp_nom", "new_resp_email", "new_resp_role"]:
+                    st.session_state.pop(k, None)
                 st.toast(f"✅ Projet « {nom} » créé avec succès.")
                 st.switch_page("pages/2_📂_Mes_Projets.py")
             except ValueError as e:

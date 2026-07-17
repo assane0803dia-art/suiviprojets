@@ -260,56 +260,44 @@ cards = [
 active = st.session_state["hub_active_section"]
 
 # ----------------------------------------------------------------------------
-# Navigation entre sections — menu déroulant (lisible et utilisable au doigt,
-# sans survol, contrairement à une barre d'icônes)
+# Grille de cartes — toujours visible ; "Ouvrir" donne un accès direct à
+# chaque section (cliquer à nouveau referme la section ouverte)
 # ----------------------------------------------------------------------------
-nav_options = [("overview", "🏠 Vue d'ensemble")] + [(key, f"{icon} {label}") for key, icon, label, count in cards]
-nav_labels = dict(nav_options)
-nav_keys = [k for k, _ in nav_options]
-current_nav_key = active if active in nav_keys else "overview"
-
-selected_nav = st.selectbox(
-    "Aller à la section",
-    options=nav_keys,
-    index=nav_keys.index(current_nav_key),
-    format_func=lambda k: nav_labels[k],
-)
-
-if selected_nav != current_nav_key:
-    st.session_state["hub_active_section"] = None if selected_nav == "overview" else selected_nav
-    st.session_state["just_switched_section"] = True
-    st.rerun()
-
-if active is None:
-    grid_cols = st.columns(4)
-    for i, (key, icon, label, count) in enumerate(cards):
-        with grid_cols[i % 4]:
-            with st.container(border=True):
-                if key in ui_style.SECTION_HELP:
-                    col_label, col_info = st.columns([5, 1])
-                    with col_label:
-                        st.markdown(f"**{icon} {label}**")
-                    with col_info:
-                        with st.popover("ℹ️", use_container_width=True):
-                            st.write(ui_style.SECTION_HELP[key])
-                else:
+grid_cols = st.columns(4)
+for i, (key, icon, label, count) in enumerate(cards):
+    with grid_cols[i % 4]:
+        with st.container(border=True):
+            if key in ui_style.SECTION_HELP:
+                col_label, col_info = st.columns([5, 1])
+                with col_label:
                     st.markdown(f"**{icon} {label}**")
-                if count is not None:
-                    st.caption(f"{count} élément(s) enregistré(s)")
+                with col_info:
+                    with st.popover("ℹ️", use_container_width=True):
+                        st.write(ui_style.SECTION_HELP[key])
+            else:
+                st.markdown(f"**{icon} {label}**")
+            if count is not None:
+                st.caption(f"{count} élément(s) enregistré(s)")
+            else:
+                st.caption("Aperçu rapide")
+
+            bouton_label = "🔵 Ouvert" if active == key else "Ouvrir"
+            if st.button(bouton_label, key=f"open_{key}", use_container_width=True,
+                         type="primary" if active == key else "secondary"):
+                if active == key:
+                    st.session_state["hub_active_section"] = None
                 else:
-                    st.caption("Aperçu rapide")
-                if st.button("Ouvrir", key=f"open_{key}", use_container_width=True):
-                    open_section(key)
-
-    if st.session_state.pop("just_switched_section", False):
-        ui_style.scroll_to_top()
-
-    st.divider()
-    st.info("👆 Cliquez sur **Ouvrir** dans une carte, ou utilisez le menu déroulant ci-dessus.")
-    st.stop()
+                    st.session_state["hub_active_section"] = key
+                st.session_state["just_switched_section"] = True
+                st.rerun()
 
 if st.session_state.pop("just_switched_section", False):
     ui_style.scroll_to_top()
+
+if active is None:
+    st.divider()
+    st.info("👆 Cliquez sur **Ouvrir** dans une carte pour gérer cette section.")
+    st.stop()
 
 st.divider()
 

@@ -4,6 +4,7 @@ pour une interface cohérente sur toutes les pages de l'application.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ----------------------------------------------------------------------------
 # Palette de couleurs (inspirée des outils modernes de gestion de projet)
@@ -108,30 +109,35 @@ def inject_global_style():
 
 def scroll_to_top():
     """Force un retour en haut de la page — à appeler juste après un changement de section,
-    pas à chaque rerun (sinon ça interromprait la saisie dans les formulaires)."""
-    st.markdown(
-        "<script>window.scrollTo({top: 0, behavior: 'instant'});</script>",
-        unsafe_allow_html=True,
+    pas à chaque rerun (sinon ça interromprait la saisie dans les formulaires).
+
+    Utilise components.html (et non st.markdown) : les balises <script> insérées via
+    st.markdown ne s'exécutent jamais dans un navigateur (règle de sécurité HTML standard
+    dès qu'on injecte du HTML via innerHTML) — seul components.html exécute du vrai JS,
+    via une iframe qui accède à la fenêtre parente."""
+    components.html(
+        """<script>
+            window.parent.scrollTo({top: 0, behavior: "instant"});
+        </script>""",
+        height=0,
     )
 
 
 def scroll_anchor(element_id):
     """Pose un repère invisible à un endroit précis de la page (ex: juste avant le
-    contenu d'une section) — à utiliser avec scroll_to_element(), car scroll_to_top()
-    seul ne suffit pas quand l'en-tête + la grille de cartes dépassent déjà la hauteur
-    de l'écran (revenir en haut ne rend pas le contenu visible pour autant)."""
+    contenu d'une section) — à utiliser avec scroll_to_element()."""
     st.markdown(f'<div id="{element_id}"></div>', unsafe_allow_html=True)
 
 
 def scroll_to_element(element_id):
     """Fait défiler jusqu'au repère posé par scroll_anchor() — à appeler juste après
     un changement de section, pas à chaque rerun."""
-    st.markdown(
+    components.html(
         f"""<script>
-            const el = document.getElementById("{element_id}");
+            const el = window.parent.document.getElementById("{element_id}");
             if (el) {{ el.scrollIntoView({{behavior: "instant", block: "start"}}); }}
         </script>""",
-        unsafe_allow_html=True,
+        height=0,
     )
 
 

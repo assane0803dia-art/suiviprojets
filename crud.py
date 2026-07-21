@@ -34,6 +34,7 @@ def run_execute(query, params=None):
 # ----------------------------------------------------------------------------
 # Utilisateurs (responsables)
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
 def get_utilisateurs(projet_id):
     """Responsables rattachés à un projet précis uniquement — chaque projet a sa
     propre liste, pour garantir l'indépendance entre projets."""
@@ -45,11 +46,13 @@ def get_utilisateurs(projet_id):
 
 def create_utilisateur(nom, email, role, projet_id):
     try:
-        return run_execute(
+        new_id = run_execute(
             "INSERT INTO Utilisateurs (nom, email, mot_de_passe, role, projet_id, date_creation) "
             "VALUES (%s, %s, '', %s, %s, NOW()) RETURNING id",
             (nom, email, role, projet_id),
         )
+        get_utilisateurs.clear()
+        return new_id
     except psycopg2.errors.UniqueViolation:
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
 
@@ -57,6 +60,7 @@ def create_utilisateur(nom, email, role, projet_id):
 def update_utilisateur(id, nom, email, role):
     try:
         run_execute("UPDATE Utilisateurs SET nom=%s, email=%s, role=%s WHERE id=%s", (nom, email, role, id))
+        get_utilisateurs.clear()
     except psycopg2.errors.UniqueViolation:
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
 
@@ -69,11 +73,17 @@ def delete_utilisateur(id):
     run_execute("UPDATE Activites SET responsable_id=NULL WHERE responsable_id=%s", (id,))
     run_execute("UPDATE Taches SET responsable_id=NULL WHERE responsable_id=%s", (id,))
     run_execute("DELETE FROM Utilisateurs WHERE id=%s", (id,))
+    get_utilisateurs.clear()
+    get_projets.clear()
+    get_objectifs.clear()
+    get_activites_by_projet.clear()
+    get_taches_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
 # Projets
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
 def get_projets():
     return run_query("""
         SELECT P.id, P.nom, P.description, P.date_debut, P.date_fin, P.budget, P.statut,
@@ -94,11 +104,13 @@ def projet_name_exists(nom, exclude_id=None):
 def create_projet(nom, description, date_debut, date_fin, budget, statut, responsable_id):
     if projet_name_exists(nom):
         raise ValueError(f"Un projet nommé « {nom} » existe déjà. Choisissez un autre nom.")
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Projets (nom, description, date_debut, date_fin, budget, statut, responsable_id) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (nom, description, date_debut, date_fin, budget, statut, responsable_id),
     )
+    get_projets.clear()
+    return new_id
 
 
 def update_projet(id, nom, description, date_debut, date_fin, budget, statut, responsable_id):
@@ -109,6 +121,7 @@ def update_projet(id, nom, description, date_debut, date_fin, budget, statut, re
         "WHERE id=%s",
         (nom, description, date_debut, date_fin, budget, statut, responsable_id, id),
     )
+    get_projets.clear()
 
 
 def delete_projet(id):
@@ -117,18 +130,22 @@ def delete_projet(id):
         delete_objectif(obj_id)
 
     run_execute("DELETE FROM Parties_Prenantes WHERE projet_id=%s", (id,))
+    get_parties_prenantes.clear()
 
     documents = run_query("SELECT id, chemin_fichier FROM Documents WHERE projet_id=%s", params=(id,))
     for _, doc in documents.iterrows():
         _delete_file_safely(doc["chemin_fichier"])
     run_execute("DELETE FROM Documents WHERE projet_id=%s", (id,))
+    get_documents.clear()
 
     run_execute("DELETE FROM Projets WHERE id=%s", (id,))
+    get_projets.clear()
 
 
 # ----------------------------------------------------------------------------
 # Objectifs
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
 def get_objectifs(projet_id):
     return run_query("""
         SELECT O.id, O.type_objectif, O.titre, O.responsable_id, U.nom AS responsable
@@ -140,11 +157,13 @@ def get_objectifs(projet_id):
 
 
 def create_objectif(projet_id, type_objectif, titre, responsable_id):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Objectifs (projet_id, type_objectif, titre, responsable_id) "
         "VALUES (%s, %s, %s, %s) RETURNING id",
         (projet_id, type_objectif, titre, responsable_id),
     )
+    get_objectifs.clear()
+    return new_id
 
 
 def update_objectif(id, type_objectif, titre, responsable_id):
@@ -152,6 +171,7 @@ def update_objectif(id, type_objectif, titre, responsable_id):
         "UPDATE Objectifs SET type_objectif=%s, titre=%s, responsable_id=%s WHERE id=%s",
         (type_objectif, titre, responsable_id, id),
     )
+    get_objectifs.clear()
 
 
 def delete_objectif(id):
@@ -159,6 +179,7 @@ def delete_objectif(id):
     for res_id in resultats["id"]:
         delete_resultat(res_id)
     run_execute("DELETE FROM Objectifs WHERE id=%s", (id,))
+    get_objectifs.clear()
 
 
 # ----------------------------------------------------------------------------
@@ -176,12 +197,14 @@ def get_resultats(objectif_id):
 
 def create_resultat(objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
                      source_verification=None, baseline=None):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Resultats (objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut, "
         "source_verification, baseline) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (objectif_id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
          source_verification, baseline),
     )
+    get_resultats_by_projet.clear()
+    return new_id
 
 
 def update_resultat(id, titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
@@ -192,6 +215,7 @@ def update_resultat(id, titre, description, indicateur, valeur_cible, valeur_act
         (titre, description, indicateur, valeur_cible, valeur_actuelle, unite, statut,
          source_verification, baseline, id),
     )
+    get_resultats_by_projet.clear()
 
 
 def delete_resultat(id):
@@ -200,6 +224,7 @@ def delete_resultat(id):
         delete_activite(act_id)
     run_execute("DELETE FROM Indicateurs_Supplementaires WHERE resultat_id=%s", (id,))
     run_execute("DELETE FROM Resultats WHERE id=%s", (id,))
+    get_resultats_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
@@ -217,11 +242,13 @@ def get_activites(resultat_id):
 
 
 def create_activite(resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Activites (resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression),
     )
+    get_activites_by_projet.clear()
+    return new_id
 
 
 def update_activite(id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression):
@@ -230,12 +257,15 @@ def update_activite(id, titre, description, responsable_id, date_debut, date_fin
         "WHERE id=%s",
         (titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, id),
     )
+    get_activites_by_projet.clear()
 
 
 def delete_activite(id):
     run_execute("DELETE FROM Taches WHERE activite_id=%s", (id,))
     run_execute("DELETE FROM Depenses WHERE activite_id=%s", (id,))
     run_execute("DELETE FROM Activites WHERE id=%s", (id,))
+    get_activites_by_projet.clear()
+    get_taches_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
@@ -253,11 +283,13 @@ def get_taches(activite_id):
 
 
 def create_tache(activite_id, titre, description, responsable_id, priorite, statut, date_debut, date_fin, progression):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Taches (activite_id, titre, description, responsable_id, priorite, statut, date_debut, date_fin, progression) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (activite_id, titre, description, responsable_id, priorite, statut, date_debut, date_fin, progression),
     )
+    get_taches_by_projet.clear()
+    return new_id
 
 
 def update_tache(id, titre, description, responsable_id, priorite, statut, date_debut, date_fin, progression):
@@ -266,10 +298,12 @@ def update_tache(id, titre, description, responsable_id, priorite, statut, date_
         "WHERE id=%s",
         (titre, description, responsable_id, priorite, statut, date_debut, date_fin, progression, id),
     )
+    get_taches_by_projet.clear()
 
 
 def delete_tache(id):
     run_execute("DELETE FROM Taches WHERE id=%s", (id,))
+    get_taches_by_projet.clear()
 
 
 def recalculate_activite_progression(activite_id):
@@ -311,12 +345,14 @@ def recalculate_activite_progression(activite_id):
         "UPDATE Activites SET progression=%s, statut=%s WHERE id=%s",
         (moyenne, nouveau_statut, activite_id),
     )
+    get_activites_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
 # Vues "à plat" — tous les éléments d'un projet, indépendamment de leur parent
 # (nécessaires pour un accès direct par section, sans ordre imposé)
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
 def get_resultats_by_projet(projet_id):
     return run_query("""
         SELECT R.id, R.titre, R.description, R.indicateur, R.valeur_cible, R.valeur_actuelle, R.unite, R.statut,
@@ -328,6 +364,7 @@ def get_resultats_by_projet(projet_id):
     """, params=(projet_id,))
 
 
+@st.cache_data(ttl=15)
 def get_activites_by_projet(projet_id):
     return run_query("""
         SELECT A.id, A.titre, A.description, A.statut, A.budget, A.progression, A.date_debut, A.date_fin,
@@ -341,6 +378,7 @@ def get_activites_by_projet(projet_id):
     """, params=(projet_id,))
 
 
+@st.cache_data(ttl=15)
 def get_taches_by_projet(projet_id):
     return run_query("""
         SELECT T.id, T.titre, T.description, T.priorite, T.statut, T.progression, T.date_debut, T.date_fin,
@@ -395,6 +433,7 @@ def revoke_acces_lecteur(user_id, projet_id):
 
 def update_resultat_valeur_actuelle(id, valeur_actuelle):
     run_execute("UPDATE Resultats SET valeur_actuelle=%s WHERE id=%s", (valeur_actuelle, id))
+    get_resultats_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
@@ -408,6 +447,7 @@ def get_indicateurs_supplementaires(resultat_id):
     )
 
 
+@st.cache_data(ttl=15)
 def get_indicateurs_supplementaires_by_projet(projet_id):
     return run_query(
         """SELECT I.id, I.nom, I.valeur_cible, I.valeur_actuelle, I.unite, I.baseline, I.source_verification,
@@ -503,11 +543,13 @@ def export_depenses():
 
 
 def create_indicateur_supplementaire(resultat_id, nom, valeur_cible, valeur_actuelle, unite, baseline=None, source_verification=None):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Indicateurs_Supplementaires (resultat_id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (resultat_id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification),
     )
+    get_indicateurs_supplementaires_by_projet.clear()
+    return new_id
 
 
 def update_indicateur_supplementaire(id, nom, valeur_cible, valeur_actuelle, unite, baseline=None, source_verification=None):
@@ -516,10 +558,12 @@ def update_indicateur_supplementaire(id, nom, valeur_cible, valeur_actuelle, uni
         "baseline=%s, source_verification=%s WHERE id=%s",
         (nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification, id),
     )
+    get_indicateurs_supplementaires_by_projet.clear()
 
 
 def delete_indicateur_supplementaire(id):
     run_execute("DELETE FROM Indicateurs_Supplementaires WHERE id=%s", (id,))
+    get_indicateurs_supplementaires_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
@@ -533,6 +577,7 @@ def get_depenses(activite_id):
     )
 
 
+@st.cache_data(ttl=15)
 def get_depenses_by_projet(projet_id):
     return run_query(
         """SELECT D.id, D.montant, D.date_depense, D.description,
@@ -548,15 +593,18 @@ def get_depenses_by_projet(projet_id):
 
 
 def create_depense(activite_id, montant, date_depense, description):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Depenses (activite_id, montant, date_depense, description) "
         "VALUES (%s, %s, %s, %s) RETURNING id",
         (activite_id, montant, date_depense, description),
     )
+    get_depenses_by_projet.clear()
+    return new_id
 
 
 def delete_depense(id):
     run_execute("DELETE FROM Depenses WHERE id=%s", (id,))
+    get_depenses_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------
@@ -587,6 +635,7 @@ def delete_rapport(id):
 # ----------------------------------------------------------------------------
 # Parties prenantes
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
 def get_parties_prenantes(projet_id):
     return run_query(
         "SELECT id, nom, type_partie, role_contribution, contact FROM Parties_Prenantes "
@@ -596,11 +645,13 @@ def get_parties_prenantes(projet_id):
 
 
 def create_partie_prenante(projet_id, nom, type_partie, role_contribution, contact):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Parties_Prenantes (projet_id, nom, type_partie, role_contribution, contact) "
         "VALUES (%s, %s, %s, %s, %s) RETURNING id",
         (projet_id, nom, type_partie, role_contribution, contact),
     )
+    get_parties_prenantes.clear()
+    return new_id
 
 
 def update_partie_prenante(id, nom, type_partie, role_contribution, contact):
@@ -608,10 +659,12 @@ def update_partie_prenante(id, nom, type_partie, role_contribution, contact):
         "UPDATE Parties_Prenantes SET nom=%s, type_partie=%s, role_contribution=%s, contact=%s WHERE id=%s",
         (nom, type_partie, role_contribution, contact, id),
     )
+    get_parties_prenantes.clear()
 
 
 def delete_partie_prenante(id):
     run_execute("DELETE FROM Parties_Prenantes WHERE id=%s", (id,))
+    get_parties_prenantes.clear()
 
 
 TYPES_PARTIE_PRENANTE = ["Bailleur", "Partenaire technique", "Bénéficiaire", "Communauté", "Autre"]
@@ -620,6 +673,7 @@ TYPES_PARTIE_PRENANTE = ["Bailleur", "Partenaire technique", "Bénéficiaire", "
 # ----------------------------------------------------------------------------
 # Documents
 # ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
 def get_documents(projet_id):
     return run_query(
         "SELECT id, nom_fichier, chemin_fichier, type_document, description, date_ajout "
@@ -629,11 +683,13 @@ def get_documents(projet_id):
 
 
 def create_document(projet_id, nom_fichier, chemin_fichier, type_document, description):
-    return run_execute(
+    new_id = run_execute(
         "INSERT INTO Documents (projet_id, nom_fichier, chemin_fichier, type_document, description) "
         "VALUES (%s, %s, %s, %s, %s) RETURNING id",
         (projet_id, nom_fichier, chemin_fichier, type_document, description),
     )
+    get_documents.clear()
+    return new_id
 
 
 def _delete_file_safely(chemin_fichier):
@@ -649,6 +705,7 @@ def delete_document(id):
     if not row.empty:
         _delete_file_safely(row.iloc[0]["chemin_fichier"])
     run_execute("DELETE FROM Documents WHERE id=%s", (id,))
+    get_documents.clear()
 
 
 TYPES_DOCUMENT = ["Rapport", "Contrat", "Fiche projet", "Photo", "Autre"]

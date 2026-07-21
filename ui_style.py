@@ -5,6 +5,7 @@ pour une interface cohérente sur toutes les pages de l'application.
 
 import streamlit as st
 import streamlit.components.v1 as components
+import uuid
 
 # ----------------------------------------------------------------------------
 # Palette de couleurs (inspirée des outils modernes de gestion de projet)
@@ -114,10 +115,16 @@ def scroll_to_top():
     Utilise components.html (et non st.markdown) : les balises <script> insérées via
     st.markdown ne s'exécutent jamais dans un navigateur (règle de sécurité HTML standard
     dès qu'on injecte du HTML via innerHTML) — seul components.html exécute du vrai JS,
-    via une iframe qui accède à la fenêtre parente."""
+    via une iframe qui accède à la fenêtre parente.
+
+    Un identifiant unique (nonce) est glissé dans le script à chaque appel : sans ça,
+    Streamlit considère un script identique au précédent comme "inchangé" et ne recharge
+    pas l'iframe, donc le script ne se réexécute pas une deuxième fois."""
+    nonce = uuid.uuid4().hex
     components.html(
-        """<script>
-            window.parent.scrollTo({top: 0, behavior: "instant"});
+        f"""<script>
+            // nonce:{nonce}
+            window.parent.scrollTo({{top: 0, behavior: "instant"}});
         </script>""",
         height=0,
     )
@@ -131,9 +138,12 @@ def scroll_anchor(element_id):
 
 def scroll_to_element(element_id):
     """Fait défiler jusqu'au repère posé par scroll_anchor() — à appeler juste après
-    un changement de section, pas à chaque rerun."""
+    un changement de section, pas à chaque rerun. Voir la note sur le nonce dans
+    scroll_to_top()."""
+    nonce = uuid.uuid4().hex
     components.html(
         f"""<script>
+            // nonce:{nonce}
             const el = window.parent.document.getElementById("{element_id}");
             if (el) {{ el.scrollIntoView({{behavior: "instant", block: "start"}}); }}
         </script>""",

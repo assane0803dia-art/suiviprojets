@@ -115,6 +115,26 @@ def scroll_to_top():
     )
 
 
+def scroll_anchor(element_id):
+    """Pose un repère invisible à un endroit précis de la page (ex: juste avant le
+    contenu d'une section) — à utiliser avec scroll_to_element(), car scroll_to_top()
+    seul ne suffit pas quand l'en-tête + la grille de cartes dépassent déjà la hauteur
+    de l'écran (revenir en haut ne rend pas le contenu visible pour autant)."""
+    st.markdown(f'<div id="{element_id}"></div>', unsafe_allow_html=True)
+
+
+def scroll_to_element(element_id):
+    """Fait défiler jusqu'au repère posé par scroll_anchor() — à appeler juste après
+    un changement de section, pas à chaque rerun."""
+    st.markdown(
+        f"""<script>
+            const el = document.getElementById("{element_id}");
+            if (el) {{ el.scrollIntoView({{behavior: "instant", block: "start"}}); }}
+        </script>""",
+        unsafe_allow_html=True,
+    )
+
+
 def tip(key, text):
     """Astuce discrète et masquable, affichée une fois par section (par clé unique)."""
     if st.session_state.get(f"tip_hidden_{key}"):

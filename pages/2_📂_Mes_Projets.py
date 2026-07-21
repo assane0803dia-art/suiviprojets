@@ -291,15 +291,19 @@ for i, (key, icon, label, count) in enumerate(cards):
                 st.session_state["just_switched_section"] = True
                 st.rerun()
 
-if st.session_state.pop("just_switched_section", False):
-    ui_style.scroll_to_top()
+just_switched = st.session_state.pop("just_switched_section", False)
 
 if active is None:
+    if just_switched:
+        ui_style.scroll_to_top()
     st.divider()
     st.info("👆 Cliquez sur **Ouvrir** dans une carte pour gérer cette section.")
     st.stop()
 
 st.divider()
+ui_style.scroll_anchor("section-content-anchor")
+if just_switched:
+    ui_style.scroll_to_element("section-content-anchor")
 
 # ==============================================================================
 # SECTION : OBJECTIFS

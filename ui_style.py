@@ -167,6 +167,33 @@ def scroll_anchor(element_id):
     st.markdown(f'<div id="{element_id}"></div>', unsafe_allow_html=True)
 
 
+def style_plotly_chart(fig):
+    """
+    Applique un style cohérent et moderne à un graphique Plotly : fond transparent
+    (s'intègre à la carte qui l'entoure au lieu d'un bloc blanc), légende horizontale
+    épurée, et infobulles (tooltips) au survol dans le même style que le reste de
+    l'application. À appeler juste après avoir créé le graphique — les réglages
+    spécifiques (titres d'axes, hauteur...) peuvent toujours être ajoutés après,
+    via un fig.update_layout(...) supplémentaire.
+    """
+    fig.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif", color=TEXT, size=13),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+            bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)",
+        ),
+        hoverlabel=dict(
+            bgcolor="white", bordercolor=BORDER,
+            font=dict(family="Inter, sans-serif", color=TEXT, size=12),
+        ),
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
+    fig.update_yaxes(showgrid=False, zeroline=False)
+    return fig
+
+
 def scroll_to_element(element_id):
     """Fait défiler jusqu'au repère posé par scroll_anchor() — à appeler juste après
     un changement de section, pas à chaque rerun. Voir la note sur le nonce dans

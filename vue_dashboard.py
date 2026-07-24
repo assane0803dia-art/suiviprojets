@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from auth import require_login, logout_button, get_last_project
-from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html
+from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart
 from indicators_config import (
     load_all_indicators,
     load_visible_indicators,
@@ -167,10 +167,10 @@ if not graphiques.empty:
                     x="budget", y="titre", orientation="h",
                     text_auto=",.0f", color_discrete_sequence=["#2563EB"],
                 )
+                style_plotly_chart(fig)
                 fig.update_layout(
-                    plot_bgcolor="white", paper_bgcolor="white",
                     xaxis_title="Budget (FCFA)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=10, b=10), height=320,
+                    margin=dict(l=10, r=10, t=40, b=10), height=320,
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -184,10 +184,10 @@ if not graphiques.empty:
                     text_auto=".0f", color="progression",
                     color_continuous_scale=["#F59E0B", "#10B981"], range_color=[0, 100],
                 )
+                style_plotly_chart(fig)
                 fig.update_layout(
-                    plot_bgcolor="white", paper_bgcolor="white",
                     xaxis_title="Progression (%)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=10, b=10), height=320,
+                    margin=dict(l=10, r=10, t=40, b=10), height=320,
                     coloraxis_showscale=False,
                 )
                 st.plotly_chart(fig, use_container_width=True)
@@ -217,9 +217,9 @@ else:
         },
     )
     fig_gantt.update_yaxes(autorange="reversed", title="")
+    style_plotly_chart(fig_gantt)
     fig_gantt.update_layout(
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(l=10, r=10, t=10, b=10), height=max(200, 40 * len(gantt_df)),
+        margin=dict(l=10, r=10, t=40, b=10), height=max(200, 40 * len(gantt_df)),
         legend_title="Statut",
     )
     st.plotly_chart(fig_gantt, use_container_width=True)

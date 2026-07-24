@@ -101,7 +101,7 @@ def inject_global_style():
 
             div.stButton > button, div.stFormSubmitButton > button {{
                 border-radius: 10px; font-weight: 600;
-                transition: transform 0.1s ease, box-shadow 0.15s ease;
+                transition: transform 0.1s ease, box-shadow 0.15s ease, background-color 0.15s ease;
             }}
             div.stButton > button:hover, div.stFormSubmitButton > button:hover {{
                 transform: translateY(-1px);
@@ -109,6 +109,21 @@ def inject_global_style():
             }}
             div.stButton > button:active, div.stFormSubmitButton > button:active {{
                 transform: translateY(0px);
+            }}
+
+            /* Action principale (Créer / Enregistrer / Ajouter) : couleur pleine */
+            button[kind="primary"], button[kind="primaryFormSubmit"] {{
+                background-color: {PRIMARY}; color: white; border: 1px solid {PRIMARY};
+            }}
+            button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {{
+                background-color: {PRIMARY_DARK}; border-color: {PRIMARY_DARK};
+            }}
+            /* Action secondaire (Annuler / Modifier / Supprimer) : contour discret */
+            button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
+                background-color: white; color: {TEXT}; border: 1px solid {BORDER};
+            }}
+            button[kind="secondary"]:hover, button[kind="secondaryFormSubmit"]:hover {{
+                background-color: #F1F5F9; border-color: {PRIMARY};
             }}
 
             [data-testid="stContainer"] {{ transition: box-shadow 0.15s ease; }}

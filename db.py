@@ -66,24 +66,39 @@ def release_connection(conn, discard=False):
     _get_pool().putconn(conn, close=discard)
 
 
-def run_query(query, params=None):
+def run_query(query, params=None, _retry=True):
     """Exécute une requête SELECT et retourne un DataFrame pandas."""
     conn = get_connection()
+    discarded = False
     try:
         return pd.read_sql(query, conn, params=_convert_params(params))
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        # Connexion morte (ex: fermée par le réseau/Supabase après une période
+        # d'inactivité) — on la jette et on retente une seule fois avec une
+        # connexion neuve, plutôt que de faire échouer l'utilisateur pour ça.
+        discarded = True
+        release_connection(conn, discard=True)
+        if _retry:
+            return run_query(query, params=params, _retry=False)
+        raise
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
-        release_connection(conn)
+        if not discarded:
+            release_connection(conn)
 
 
-def run_execute(query, params=None):
+def run_execute(query, params=None, _retry=True):
     """
     Exécute une requête d'écriture. Si elle se termine par "RETURNING ...",
     retourne cette valeur (motif standard PostgreSQL pour récupérer un ID inséré).
     """
     conn = get_connection()
+    discarded = False
     try:
         cursor = conn.cursor()
         params = _convert_params(params)
@@ -100,8 +115,18 @@ def run_execute(query, params=None):
 
         conn.commit()
         return result
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        discarded = True
+        release_connection(conn, discard=True)
+        if _retry:
+            return run_execute(query, params=params, _retry=False)
+        raise
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
-        release_connection(conn)
+        if not discarded:
+            release_connection(conn)

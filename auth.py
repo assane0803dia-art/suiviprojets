@@ -161,7 +161,15 @@ def login_form():
                 if not username or not password:
                     st.warning("Veuillez remplir tous les champs.")
                 else:
-                    user = verify_credentials(username.strip(), password)
+                    try:
+                        user = verify_credentials(username.strip(), password)
+                    except Exception:
+                        st.error(
+                            "🔌 Impossible de contacter la base de données. Si l'application n'a pas été "
+                            "utilisée depuis plusieurs jours, Supabase peut avoir mis le projet en pause — "
+                            "reconnectez-vous au tableau de bord Supabase et cliquez sur \"Restore\", puis réessayez."
+                        )
+                        st.stop()
                     if user:
                         st.session_state["authenticated"] = True
                         st.session_state["user"] = user
@@ -177,8 +185,22 @@ def logout_button():
     """Affiche les infos utilisateur et un bouton de déconnexion dans la barre latérale."""
     with st.sidebar:
         user = st.session_state.get("user", {})
-        st.write(f"👤 **{user.get('username', '')}**")
-        st.caption(f"Rôle : {user.get('role', '')}")
+        username = user.get("username", "")
+        role = user.get("role", "")
+        initiale = username[:1].upper() if username else "?"
+
+        st.markdown(
+            f"""<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <div style="width:36px; height:36px; border-radius:999px; background-color:#EFF6FF;
+                                display:flex; align-items:center; justify-content:center;
+                                font-weight:700; color:#2563EB; flex-shrink:0;">{initiale}</div>
+                    <div>
+                        <div style="font-weight:600; color:#1F2937; line-height:1.2;">{username}</div>
+                        <span class="badge badge-muted">{role}</span>
+                    </div>
+                </div>""",
+            unsafe_allow_html=True,
+        )
         if st.button("🚪 Se déconnecter", use_container_width=True):
             st.session_state["authenticated"] = False
             st.session_state["user"] = None

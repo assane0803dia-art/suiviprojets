@@ -130,6 +130,28 @@ def inject_global_style():
 
             [data-testid="stSidebar"] .stCaption {{ color: {MUTED}; }}
 
+            /* Sidebar premium : fond blanc distinct, séparation nette, navigation aérée */
+            [data-testid="stSidebar"] {{
+                background-color: #FFFFFF;
+                border-right: 1px solid {BORDER};
+            }}
+            [data-testid="stSidebarNav"] a, [data-testid="stSidebarNavLink"] {{
+                border-radius: 10px;
+                margin: 2px 8px;
+                padding: 6px 10px;
+                transition: background-color 0.15s ease, color 0.15s ease;
+            }}
+            [data-testid="stSidebarNav"] a:hover, [data-testid="stSidebarNavLink"]:hover {{
+                background-color: #EFF6FF;
+                color: {PRIMARY};
+            }}
+            [data-testid="stSidebarNav"] a[aria-current="page"],
+            [data-testid="stSidebarNavLink"][aria-current="page"] {{
+                background-color: #EFF6FF;
+                color: {PRIMARY};
+                font-weight: 700;
+            }}
+
             [data-testid="stMetricValue"] {{ font-size: 1.05rem; }}
             [data-testid="stMetricLabel"] {{ font-size: 0.72rem; }}
             [data-testid="stMetricDelta"] {{ font-size: 0.72rem; }}
@@ -271,8 +293,8 @@ def ai_text_field(label, key, contexte="", height=None, is_area=True):
 def sidebar_brand():
     with st.sidebar:
         st.markdown(
-            f"""<div style="padding: 6px 0 14px 0;">
-                    <span style="font-size:1.3rem; font-weight:800; color:{TEXT};">📊 SuiviProjets</span><br>
+            f"""<div style="padding: 10px 4px 16px 4px; margin-bottom: 4px;">
+                    <span style="font-size:1.35rem; font-weight:800; color:{TEXT};">📊 SuiviProjets</span><br>
                     <span style="font-size:0.8rem; color:{MUTED};">Gestion &amp; suivi de projets</span>
                 </div>""",
             unsafe_allow_html=True,

@@ -112,7 +112,11 @@ if not df_projet.empty and not kpis.empty:
             value = compute_kpi_value(row, df_projet)
             display_value = format_kpi_value(value, row["format_affichage"])
             with col:
-                st.markdown(kpi_card_html(row["icone"] or "", row["libelle"], display_value), unsafe_allow_html=True)
+                progress_pct = value if row["format_affichage"] == "pourcentage" and value is not None else None
+                st.markdown(
+                    kpi_card_html(row["icone"] or "", row["libelle"], display_value, progress_percent=progress_pct),
+                    unsafe_allow_html=True,
+                )
 
 st.write("")
 

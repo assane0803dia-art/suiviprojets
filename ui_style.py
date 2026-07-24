@@ -54,14 +54,28 @@ def inject_global_style():
                 box-shadow: 0 1px 3px rgba(0,0,0,0.06);
                 border-left: 5px solid {PRIMARY};
                 margin-bottom: 8px;
-                transition: box-shadow 0.15s ease;
+                transition: box-shadow 0.15s ease, transform 0.15s ease;
             }}
-            .kpi-card:hover {{ box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
+            .kpi-card:hover {{ box-shadow: 0 6px 16px rgba(0,0,0,0.10); transform: translateY(-2px); }}
+            .kpi-icon-circle {{
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 38px; height: 38px; border-radius: 999px;
+                background-color: #EFF6FF; font-size: 1.1rem; margin-bottom: 10px;
+            }}
             .kpi-label {{
                 font-size: 0.8rem; color: {MUTED}; font-weight: 600;
                 text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
             }}
             .kpi-value {{ font-size: 1.8rem; font-weight: 700; color: {TEXT}; }}
+            .kpi-progress-track {{
+                width: 100%; height: 6px; border-radius: 999px;
+                background-color: #E5E7EB; margin-top: 12px; overflow: hidden;
+            }}
+            .kpi-progress-fill {{
+                height: 100%; border-radius: 999px;
+                background: linear-gradient(90deg, {PRIMARY}, {SECONDARY});
+                transition: width 0.4s ease;
+            }}
 
             .section-title {{
                 font-size: 1.05rem; font-weight: 700; color: {TEXT};
@@ -224,10 +238,23 @@ def sidebar_brand():
         st.divider()
 
 
-def kpi_card_html(icon, label, value):
+def kpi_card_html(icon, label, value, progress_percent=None):
+    """
+    Carte KPI enrichie : icône dans un badge coloré, valeur mise en avant, et une
+    mini barre de progression optionnelle — affichée uniquement quand une vraie
+    valeur en pourcentage est disponible (jamais une tendance inventée sans donnée
+    historique réelle pour la calculer)."""
+    barre = ""
+    if progress_percent is not None:
+        pct = max(0, min(100, progress_percent))
+        barre = f"""<div class="kpi-progress-track">
+                        <div class="kpi-progress-fill" style="width:{pct}%;"></div>
+                    </div>"""
     return f"""<div class="kpi-card">
-                    <div class="kpi-label">{icon} {label}</div>
+                    <div class="kpi-icon-circle">{icon}</div>
+                    <div class="kpi-label">{label}</div>
                     <div class="kpi-value">{value}</div>
+                    {barre}
                 </div>"""
 
 

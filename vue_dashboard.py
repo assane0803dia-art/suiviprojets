@@ -161,7 +161,7 @@ if not graphiques.empty:
                 fig = px.bar(
                     activites_df.sort_values("budget", ascending=True),
                     x="budget", y="titre", orientation="h",
-                    text_auto=",.0f", color_discrete_sequence=["#4F46E5"],
+                    text_auto=",.0f", color_discrete_sequence=["#2563EB"],
                 )
                 fig.update_layout(
                     plot_bgcolor="white", paper_bgcolor="white",
@@ -178,7 +178,7 @@ if not graphiques.empty:
                     activites_df.sort_values("progression", ascending=True),
                     x="progression", y="titre", orientation="h",
                     text_auto=".0f", color="progression",
-                    color_continuous_scale=["#F59E0B", "#16A34A"], range_color=[0, 100],
+                    color_continuous_scale=["#F59E0B", "#10B981"], range_color=[0, 100],
                 )
                 fig.update_layout(
                     plot_bgcolor="white", paper_bgcolor="white",
@@ -209,7 +209,7 @@ else:
     fig_gantt = px.timeline(
         gantt_df, x_start="date_debut", x_end="date_fin", y="titre",
         color="statut", color_discrete_map={
-            "À faire": "#94A3B8", "En cours": "#F59E0B", "Terminé": "#16A34A", "Bloqué": "#DC2626",
+            "À faire": "#94A3B8", "En cours": "#F59E0B", "Terminé": "#10B981", "Bloqué": "#EF4444",
         },
     )
     fig_gantt.update_yaxes(autorange="reversed", title="")

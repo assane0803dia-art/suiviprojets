@@ -10,15 +10,17 @@ import uuid
 # ----------------------------------------------------------------------------
 # Palette de couleurs (inspirée des outils modernes de gestion de projet)
 # ----------------------------------------------------------------------------
-PRIMARY = "#4F46E5"       # Indigo
-PRIMARY_DARK = "#4338CA"
-SUCCESS = "#16A34A"
+PRIMARY = "#2563EB"       # Bleu — couleur principale
+PRIMARY_DARK = "#1D4ED8"
+SECONDARY = "#10B981"     # Vert — couleur secondaire
+ACCENT = "#F59E0B"        # Orange — accent
+SUCCESS = "#10B981"
 WARNING = "#F59E0B"
-DANGER = "#DC2626"
+DANGER = "#EF4444"        # Rouge doux (pas un rouge agressif)
 BG = "#F8FAFC"
 CARD_BG = "#FFFFFF"
-TEXT = "#0F172A"
-MUTED = "#64748B"
+TEXT = "#1F2937"
+MUTED = "#6B7280"
 BORDER = "#E2E8F0"
 
 

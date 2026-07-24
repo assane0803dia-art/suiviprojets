@@ -307,19 +307,24 @@ def kpi_card_html(icon, label, value, progress_percent=None):
     Carte KPI enrichie : icône dans un badge coloré, valeur mise en avant, et une
     mini barre de progression optionnelle — affichée uniquement quand une vraie
     valeur en pourcentage est disponible (jamais une tendance inventée sans donnée
-    historique réelle pour la calculer)."""
+    historique réelle pour la calculer).
+
+    Construite en une seule ligne HTML continue (sans saut de ligne) : une ligne
+    vide au milieu du HTML (ex: quand `barre` est une chaîne vide) fait que
+    Streamlit interrompt le bloc HTML et affiche la suite comme du texte brut.
+    """
     barre = ""
     if progress_percent is not None:
         pct = max(0, min(100, progress_percent))
-        barre = f"""<div class="kpi-progress-track">
-                        <div class="kpi-progress-fill" style="width:{pct}%;"></div>
-                    </div>"""
-    return f"""<div class="kpi-card">
-                    <div class="kpi-icon-circle">{icon}</div>
-                    <div class="kpi-label">{label}</div>
-                    <div class="kpi-value">{value}</div>
-                    {barre}
-                </div>"""
+        barre = f'<div class="kpi-progress-track"><div class="kpi-progress-fill" style="width:{pct}%;"></div></div>'
+    return (
+        f'<div class="kpi-card">'
+        f'<div class="kpi-icon-circle">{icon}</div>'
+        f'<div class="kpi-label">{label}</div>'
+        f'<div class="kpi-value">{value}</div>'
+        f'{barre}'
+        f'</div>'
+    )
 
 
 def section_title(icon, text, help_text=None):

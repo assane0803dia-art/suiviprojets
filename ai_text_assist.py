@@ -18,6 +18,20 @@ MODES = {
     "professionnel": "Réécris ce texte dans un registre professionnel et formel, adapté à un rapport de gestion de projet.",
     "resumer": "Résume ce texte en 1 à 2 phrases courtes, en gardant uniquement l'essentiel.",
     "developper": "Développe ce texte en 2 à 3 phrases supplémentaires, avec des précisions cohérentes et réalistes par rapport au contexte donné — n'invente pas de chiffres précis.",
+    "smart": (
+        "Reformule cet objectif spécifique pour qu'il respecte les critères SMART : "
+        "Spécifique (précis, sans ambiguïté), Mesurable (quantifiable), Atteignable (réaliste "
+        "compte tenu du contexte), pertinent (aligné sur l'objectif général et le contexte du "
+        "projet), et Temporellement défini (avec une échéance implicite ou explicite si le "
+        "contexte le permet). Garde une seule phrase concise, sans expliquer la méthode SMART, "
+        "juste l'objectif reformulé."
+    ),
+    "pertinent": (
+        "Reformule cet objectif général pour qu'il soit plus pertinent : qu'il exprime clairement "
+        "la finalité globale du projet, en cohérence avec le contexte donné, sans devenir trop "
+        "détaillé ou mesurable (ça reste le rôle des objectifs spécifiques). Garde une seule phrase "
+        "claire et ambitieuse, sans explication de la reformulation."
+    ),
 }
 
 

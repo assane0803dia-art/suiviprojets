@@ -248,9 +248,11 @@ def tip(key, text):
             st.rerun()
 
 
-def ai_text_field(label, key, contexte="", height=None, is_area=True):
+def ai_text_field(label, key, contexte="", height=None, is_area=True, boutons=None):
     """
-    Champ de texte avec assistance IA intégrée (Améliorer / Pro / Résumer / Développer).
+    Champ de texte avec assistance IA intégrée. Par défaut : Améliorer / Pro / Résumer /
+    Développer — mais un jeu de boutons personnalisé peut être fourni via `boutons`
+    (liste de tuples (libellé, mode), mode devant exister dans ai_text_assist.MODES).
 
     Remplace un appel direct à st.text_area/st.text_input : gère correctement le fait
     que Streamlit interdit de modifier st.session_state[key] après que le widget
@@ -266,13 +268,14 @@ def ai_text_field(label, key, contexte="", height=None, is_area=True):
     else:
         value = st.text_input(label, key=key)
 
-    cols = st.columns(4)
-    boutons = [
-        ("✨ Améliorer", "ameliorer"),
-        ("📝 Pro", "professionnel"),
-        ("✂️ Résumer", "resumer"),
-        ("➕ Développer", "developper"),
-    ]
+    if boutons is None:
+        boutons = [
+            ("✨ Améliorer", "ameliorer"),
+            ("📝 Pro", "professionnel"),
+            ("✂️ Résumer", "resumer"),
+            ("➕ Développer", "developper"),
+        ]
+    cols = st.columns(len(boutons))
     for col, (btn_label, mode) in zip(cols, boutons):
         with col:
             if st.button(btn_label, key=f"{key}_btn_{mode}", use_container_width=True):

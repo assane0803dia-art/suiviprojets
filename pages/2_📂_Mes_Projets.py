@@ -493,8 +493,23 @@ else:
                             index=crud.TYPES_OBJECTIF.index(obj["type_objectif"]) if obj["type_objectif"] in crud.TYPES_OBJECTIF else 0,
                             key=f"type_edit_obj_{obj['id']}",
                         )
+
+                        edit_obj_titre_key = f"edit_obj_titre_{obj['id']}"
+                        if edit_obj_titre_key not in st.session_state:
+                            st.session_state[edit_obj_titre_key] = obj["titre"]
+
+                        if type_objectif_edit == "Spécifique":
+                            boutons_ia_obj = [("🎯 Rendre SMART", "smart")]
+                        else:
+                            boutons_ia_obj = [("🧭 Rendre plus pertinent", "pertinent")]
+
+                        titre = ai_text_field(
+                            "Titre *", key=edit_obj_titre_key, is_area=False,
+                            contexte=f"Projet : {projet_row['description'] or ''}",
+                            boutons=boutons_ia_obj,
+                        )
+
                         with st.form(f"form_edit_obj_{obj['id']}"):
-                            titre = st.text_input("Titre *", value=obj["titre"])
                             responsable_id = None
                             if type_objectif_edit == "Spécifique":
                                 resp_options = responsable_options()
@@ -507,11 +522,13 @@ else:
                             col_save, col_delete = st.columns(2)
                             if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
                                 crud.update_objectif(obj["id"], type_objectif_edit, titre, responsable_id)
+                                st.session_state.pop(edit_obj_titre_key, None)
                                 st.toast("✅ Objectif mis à jour avec succès.")
                                 st.session_state["editing_obj_id"] = None
                                 st.rerun()
                             if col_delete.form_submit_button("🗑️ Supprimer", use_container_width=True):
                                 crud.delete_objectif(obj["id"])
+                                st.session_state.pop(edit_obj_titre_key, None)
                                 st.warning("Objectif supprimé (ainsi que ses résultats, activités et tâches liés).")
                                 st.session_state["editing_obj_id"] = None
                                 st.rerun()

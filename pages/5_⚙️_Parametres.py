@@ -7,7 +7,6 @@ from auth import (
     change_password, delete_own_account, get_recent_sessions,
 )
 from ui_style import sidebar_brand, section_title, badge_html, tip
-from indicators_config import load_all_indicators, update_indicator
 import crud
 
 require_login()
@@ -28,7 +27,7 @@ if profile is None:
 
 tab_labels = ["👤 Compte", "📁 Projet", "🤖 IA", "🔔 Notifications", "🔒 Sécurité"]
 if is_admin:
-    tab_labels += ["📊 Tableau de bord", "👁️ Accès lecteurs"]
+    tab_labels += ["🛡️ Administration"]
 
 tabs = st.tabs(tab_labels)
 
@@ -138,9 +137,11 @@ with tabs[3]:
             st.rerun()
 
     st.info(
-        "🚧 **À noter** : les notifications par email sont enregistrées comme préférence, mais "
-        "l'envoi réel n'est pas encore activé (nécessite la configuration d'un service d'envoi "
-        "d'emails, ex. SendGrid). Dites-le-moi si vous voulez qu'on le mette en place."
+        "ℹ️ L'envoi d'email fonctionne pour recevoir vos rapports (page 📊 Rapports) et vos "
+        "recommandations IA (page 🤖 IA) à la demande, en un clic. Les alertes automatiques en "
+        "arrière-plan (ex: être prévenu dès qu'une tâche prend du retard sans avoir ouvert l'app) "
+        "ne sont pas possibles sur ce type d'hébergement, qui met l'application en veille quand "
+        "personne ne l'utilise."
     )
 
 # ==============================================================================
@@ -204,68 +205,16 @@ with tabs[4]:
             st.rerun()
 
 # ==============================================================================
-# TABLEAU DE BORD (admin uniquement)
+# ADMINISTRATION (admin uniquement) — règles générales + accès lecteurs
 # ==============================================================================
 if is_admin:
     with tabs[5]:
-        tip("dashboard_config", "Décochez un indicateur pour le masquer immédiatement du tableau de bord de toute l'équipe.")
+        st.info(
+            "💡 La configuration des indicateurs du tableau de bord se fait désormais "
+            "directement depuis **🏠 Tableau de bord** (section « ⚙️ Choisir les "
+            "indicateurs affichés »)."
+        )
 
-        df = load_all_indicators()
-
-        kpi_count = len(df[df["type_element"] == "kpi"])
-        kpi_actifs = len(df[(df["type_element"] == "kpi") & (df["visible"] == 1)])
-        graph_count = len(df[df["type_element"] == "graphique"])
-        graph_actifs = len(df[(df["type_element"] == "graphique") & (df["visible"] == 1)])
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(f"""<div class="app-card">
-                <div class="kpi-label">📊 KPI actifs</div>
-                <div class="kpi-value">{kpi_actifs} / {kpi_count}</div>
-            </div>""", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"""<div class="app-card">
-                <div class="kpi-label">📈 Graphiques actifs</div>
-                <div class="kpi-value">{graph_actifs} / {graph_count}</div>
-            </div>""", unsafe_allow_html=True)
-
-        st.write("")
-
-        TYPE_LABELS = {"kpi": ("📊", "Indicateurs clés (KPI)"), "graphique": ("📈", "Graphiques")}
-
-        for type_element, (icon, label) in TYPE_LABELS.items():
-            subset = df[df["type_element"] == type_element]
-            with st.container(border=True):
-                st.markdown(f"**{icon} {label}**")
-                if subset.empty:
-                    st.caption("Aucun indicateur de ce type.")
-                    continue
-
-                with st.form(f"form_{type_element}"):
-                    updated_rows = []
-                    header_cols = st.columns([0.6, 3.4, 1.2, 1.8])
-                    header_cols[0].markdown("**Actif**")
-                    header_cols[1].markdown("**Indicateur**")
-                    header_cols[2].markdown("**Ordre**")
-
-                    for _, row in subset.iterrows():
-                        cols = st.columns([0.6, 3.4, 1.2, 1.8])
-                        visible = cols[0].checkbox("Actif", value=bool(row["visible"]), key=f"visible_{row['id']}", label_visibility="collapsed")
-                        cols[1].write(f"{row['icone'] or ''} {row['libelle']}")
-                        ordre = cols[2].number_input("Ordre", value=int(row["ordre"]), min_value=0, max_value=100, step=1, key=f"ordre_{row['id']}", label_visibility="collapsed")
-                        badge_kind = "success" if row["visible"] else "muted"
-                        cols[3].markdown(badge_html("Actif" if row["visible"] else "Masqué", badge_kind), unsafe_allow_html=True)
-                        updated_rows.append((row["id"], visible, ordre))
-
-                    if st.form_submit_button(f"💾 Enregistrer", use_container_width=True):
-                        for indicateur_id, visible, ordre in updated_rows:
-                            update_indicator(indicateur_id, visible, ordre)
-                        st.cache_data.clear()
-                        st.toast("✅ Configuration enregistrée avec succès.")
-                        st.rerun()
-            st.write("")
-
-        st.divider()
         section_title("🛡️", "Règles générales")
         with st.container(border=True):
             st.markdown("**📁 Noms de projet**")
@@ -277,11 +226,8 @@ if is_admin:
             st.caption("Supprimer un projet supprime automatiquement tout ce qui en dépend, après confirmation explicite.")
             st.markdown(badge_html("Activé", "success"), unsafe_allow_html=True)
 
-# ==============================================================================
-# ACCÈS LECTEURS (admin uniquement)
-# ==============================================================================
-if is_admin:
-    with tabs[6]:
+        st.divider()
+        section_title("👁️", "Accès en lecture seule")
         tip("acces_lecteurs", "Un compte lecteur ne voit que les projets explicitement partagés ici.")
 
         lecteurs_df = crud.get_lecteurs()

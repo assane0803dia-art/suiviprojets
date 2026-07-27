@@ -129,8 +129,6 @@ with tabs[2]:
 # NOTIFICATIONS
 # ==============================================================================
 with tabs[3]:
-    tip("notifications", "Les notifications par email nécessitent encore une configuration technique — voir la remarque ci-dessous.")
-
     with st.form("form_notifications"):
         notif_app = st.toggle("Notifications dans l'application", value=bool(profile["notif_app"]))
         notif_alertes = st.toggle("Alertes de retards et de risques", value=bool(profile["notif_alertes"]))

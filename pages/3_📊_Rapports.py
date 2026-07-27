@@ -5,6 +5,7 @@ from ui_style import sidebar_brand, section_title, tip
 import crud
 import ai_report_generator as ai
 import report_export
+import email_service
 
 require_login()
 sidebar_brand()
@@ -91,7 +92,7 @@ if "rapport_draft" in st.session_state:
     st.session_state["rapport_draft"] = rapport_edite
 
     st.write("")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         titre_rapport = st.text_input("Titre du rapport à sauvegarder", value=f"Rapport — {projet_row['nom']} — {datetime.now().strftime('%d/%m/%Y')}")
@@ -116,6 +117,23 @@ if "rapport_draft" in st.session_state:
             mime="application/pdf",
             use_container_width=True,
         )
+    with col4:
+        st.write("")
+        st.write("")
+        if email_service.is_configured():
+            profile = get_profile(user["id"])
+            email_destination = profile.get("email") if profile else None
+            if email_destination:
+                if st.button("📧 M'envoyer par email", use_container_width=True):
+                    sujet = f"SuiviProjets — Rapport « {projet_row['nom']} »"
+                    with st.spinner("Envoi en cours..."):
+                        succes, message = email_service.send_email(email_destination, sujet, rapport_edite)
+                    if succes:
+                        st.toast(f"✅ {message}")
+                    else:
+                        st.error(message)
+            else:
+                st.caption("💡 Ajoutez votre email dans Paramètres → Compte pour recevoir vos rapports.")
 
 st.divider()
 

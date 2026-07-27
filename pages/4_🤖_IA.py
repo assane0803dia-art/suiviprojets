@@ -1,8 +1,10 @@
 import streamlit as st
 from auth import require_login, logout_button
+import auth
 from ui_style import sidebar_brand, section_title, badge_html, tip
 import crud
 import ai_report_generator as ai
+import email_service
 
 require_login()
 sidebar_brand()
@@ -97,6 +99,24 @@ if (
 ):
     with st.container(border=True):
         st.markdown(st.session_state["ia_recommandations"])
+
+    profile = auth.get_profile(st.session_state["user"]["id"])
+    email_destination = profile.get("email") if profile else None
+
+    if email_service.is_configured():
+        if email_destination:
+            if st.button("📧 M'envoyer ces recommandations par email", key="send_reco_email"):
+                nom_projet = projet_options[selected_projet_id]
+                sujet = f"SuiviProjets — Recommandations pour « {nom_projet} »"
+                corps = f"Recommandations pour le projet « {nom_projet} » :\n\n{st.session_state['ia_recommandations']}"
+                with st.spinner("Envoi en cours..."):
+                    succes, message = email_service.send_email(email_destination, sujet, corps)
+                if succes:
+                    st.toast(f"✅ {message}")
+                else:
+                    st.error(message)
+        else:
+            st.caption("💡 Ajoutez votre email dans **Paramètres → Compte** pour pouvoir recevoir ces recommandations par email.")
 
 st.divider()
 st.caption(

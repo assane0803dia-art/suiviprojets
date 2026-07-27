@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from auth import require_login, logout_button, get_last_project
 from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart
+from i18n import t
 from indicators_config import (
     load_all_indicators,
     load_visible_indicators,
@@ -28,8 +29,8 @@ def load_vue_dashboard():
 
 col_title, col_refresh = st.columns([6, 1])
 with col_title:
-    st.title("🏠 Tableau de bord")
-    st.caption("Suivi en temps réel, projet par projet")
+    st.title(t("dashboard_title"))
+    st.caption(t("dashboard_subtitle"))
 with col_refresh:
     st.write("")
     if st.button("🔄 Actualiser", use_container_width=True):

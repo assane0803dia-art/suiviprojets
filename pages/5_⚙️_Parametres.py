@@ -1,4 +1,5 @@
 import streamlit as st
+from i18n import t
 import os
 from datetime import datetime
 from auth import (
@@ -16,7 +17,7 @@ logout_button()
 user = st.session_state.get("user", {})
 is_admin = user.get("role") == "admin"
 
-st.title("⚙️ Paramètres")
+st.title(t("settings_title"))
 st.caption("Votre compte, vos préférences, et la configuration de l'application.")
 st.divider()
 
@@ -89,10 +90,14 @@ with tabs[1]:
         )
         if st.form_submit_button("💾 Enregistrer", use_container_width=True):
             update_preferences_projet(user["id"], langue, fuseau, modele_rapport)
+            st.session_state["langue_utilisateur"] = langue
             st.toast("✅ Préférences mises à jour avec succès.")
             st.rerun()
 
-    st.caption("ℹ️ L'application est actuellement disponible en français uniquement — le sélecteur de langue est prêt pour une future traduction anglaise.")
+    st.caption(
+        "ℹ️ Traduction anglaise en cours : la navigation et les titres de pages s'adaptent déjà "
+        "à cette préférence — le reste de l'application (formulaires, boutons) reste en français pour l'instant."
+    )
 
 # ==============================================================================
 # IA

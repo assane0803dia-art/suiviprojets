@@ -1,4 +1,5 @@
 import streamlit as st
+from i18n import t
 from datetime import datetime
 from auth import require_login, logout_button, get_profile
 from ui_style import sidebar_brand, section_title, tip
@@ -14,8 +15,8 @@ logout_button()
 user = st.session_state.get("user", {})
 profile = get_profile(user["id"])
 
-st.title("📊 Rapports")
-st.caption("Génération automatique de rapports d'exécution par IA (Claude), à partir des données déjà saisies dans le projet.")
+st.title(t("reports_title"))
+st.caption(t("reports_subtitle"))
 st.divider()
 
 projets_df = crud.get_projets()

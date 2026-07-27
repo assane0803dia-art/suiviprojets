@@ -1,4 +1,5 @@
 import streamlit as st
+from i18n import t
 from auth import require_login, logout_button
 from ui_style import sidebar_brand, section_title, tip, ai_text_field
 import crud
@@ -8,8 +9,8 @@ require_login()
 sidebar_brand()
 logout_button()
 
-st.title("📁 Nouveau projet")
-st.caption("Créez votre projet en quelques secondes. Vous compléterez objectifs, résultats, activités, tâches et indicateurs ensuite, dans l'ordre que vous voulez, depuis son espace de gestion.")
+st.title(t("new_project_title"))
+st.caption(t("new_project_subtitle"))
 st.divider()
 
 section_title("📌", "Informations de base")

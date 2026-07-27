@@ -173,6 +173,8 @@ def login_form():
                     if user:
                         st.session_state["authenticated"] = True
                         st.session_state["user"] = user
+                        profil = get_profile(user["id"])
+                        st.session_state["langue_utilisateur"] = (profil.get("langue") if profil else None) or "fr"
                         _log_connexion(user["id"])
                         _redirect_after_login(user)
                     else:

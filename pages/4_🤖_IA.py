@@ -1,4 +1,5 @@
 import streamlit as st
+from i18n import t
 from auth import require_login, logout_button
 import auth
 from ui_style import sidebar_brand, section_title, badge_html, tip
@@ -10,8 +11,8 @@ require_login()
 sidebar_brand()
 logout_button()
 
-st.title("🤖 Assistant IA")
-st.caption("Détection de risques en temps réel sur tous vos projets, et recommandations sur demande.")
+st.title(t("ai_title"))
+st.caption(t("ai_subtitle"))
 st.divider()
 
 projets_df = crud.get_projets()

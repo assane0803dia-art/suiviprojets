@@ -1,4 +1,5 @@
 import streamlit as st
+from i18n import t
 import os
 import pandas as pd
 from auth import require_login, logout_button
@@ -13,8 +14,8 @@ require_login()
 sidebar_brand()
 logout_button()
 
-st.title("📂 Mes projets")
-st.caption("Votre espace de gestion : ouvrez n'importe quelle section, dans l'ordre que vous voulez.")
+st.title(t("my_projects_title"))
+st.caption(t("my_projects_subtitle"))
 st.divider()
 
 # ----------------------------------------------------------------------------

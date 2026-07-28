@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from auth import require_login, logout_button, get_last_project
-from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart
+from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip
 from i18n import t
 from indicators_config import (
     load_all_indicators,
@@ -13,6 +13,7 @@ from indicators_config import (
 )
 import db
 import crud
+import critical_path
 
 require_login()
 sidebar_brand()
@@ -198,7 +199,7 @@ if not graphiques.empty:
         st.write("")
 
 # ----------------------------------------------------------------------------
-# Diagramme de Gantt — planification des activités
+# Diagramme de Gantt — planification des activités, avec chemin critique
 # ----------------------------------------------------------------------------
 section_title("📅", "Planification (Gantt)")
 
@@ -210,18 +211,26 @@ else:
     gantt_df = gantt_df.copy()
     gantt_df["date_debut"] = pd.to_datetime(gantt_df["date_debut"])
     gantt_df["date_fin"] = pd.to_datetime(gantt_df["date_fin"])
+    gantt_df = gantt_df.sort_values("date_debut")  # ordre chronologique, pour suivre visuellement l'enchaînement
+
+    chemin_critique_ids = critical_path.compute_critical_path(activites_df)
+    gantt_df["chemin"] = gantt_df["id"].apply(lambda x: "🔴 Chemin critique" if x in chemin_critique_ids else "Autres activités")
+
+    tip("gantt_chemin_critique", "Le chemin critique (en rouge) est la séquence d'activités qui détermine la durée totale du projet — tout retard sur l'une d'elles retarde le projet entier. Renseignez le champ « Dépend de » sur vos activités pour le faire apparaître.")
 
     fig_gantt = px.timeline(
         gantt_df, x_start="date_debut", x_end="date_fin", y="titre",
-        color="statut", color_discrete_map={
-            "À faire": "#94A3B8", "En cours": "#F59E0B", "Terminé": "#10B981", "Bloqué": "#EF4444",
+        color="chemin", color_discrete_map={
+            "🔴 Chemin critique": "#EF4444", "Autres activités": "#93C5FD",
         },
+        category_orders={"titre": gantt_df["titre"].tolist()},
+        hover_data={"statut": True},
     )
     fig_gantt.update_yaxes(autorange="reversed", title="")
     style_plotly_chart(fig_gantt)
     fig_gantt.update_layout(
         margin=dict(l=10, r=10, t=40, b=10), height=max(200, 40 * len(gantt_df)),
-        legend_title="Statut",
+        legend_title="",
     )
     st.plotly_chart(fig_gantt, use_container_width=True)
 

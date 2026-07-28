@@ -773,13 +773,21 @@ else:
                     statut_a = st.selectbox("Statut", crud.STATUTS_GENERIQUE)
                     resp_options = responsable_options()
                     responsable_id_a = st.selectbox("Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x])
+                    depend_options = {None: "— Aucune (activité de départ) —"}
+                    for _, a in activites_df.iterrows():
+                        depend_options[a["id"]] = a["titre"]
+                    depend_de_a = st.selectbox(
+                        "Dépend de (doit démarrer après cette activité)",
+                        options=list(depend_options.keys()), format_func=lambda x: depend_options[x],
+                        help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt.",
+                    )
                     if st.form_submit_button("Ajouter"):
                         if not titre_a:
                             st.warning("Le titre est obligatoire.")
                         elif not validators.dates_valides(date_debut_a, date_fin_a):
                             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
                         else:
-                            crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a)
+                            crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a, depend_de_a)
                             st.session_state.pop("act_suggestions", None)
                             st.toast("✅ Activité ajoutée avec succès.")
                             st.rerun()
@@ -830,16 +838,31 @@ else:
                                     "Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x],
                                     index=list(resp_options.keys()).index(current_resp),
                                 )
+
+                                autres_activites = activites_df[activites_df["id"] != act["id"]] if not activites_df.empty else activites_df
+                                depend_options = {None: "— Aucune (activité de départ) —"}
+                                for _, a2 in autres_activites.iterrows():
+                                    depend_options[a2["id"]] = a2["titre"]
+                                current_depend = act["depend_de_activite_id"] if act["depend_de_activite_id"] in depend_options else None
+                                depend_de_a = st.selectbox(
+                                    "Dépend de (doit démarrer après cette activité)",
+                                    options=list(depend_options.keys()), format_func=lambda x: depend_options[x],
+                                    index=list(depend_options.keys()).index(current_depend),
+                                    help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt.",
+                                )
+
                                 col_save, col_delete = st.columns(2)
                                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
                                     if not validators.dates_valides(date_debut_a, date_fin_a):
                                         st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
+                                    elif validators.cree_une_boucle(act["id"], depend_de_a, activites_df):
+                                        st.warning("⚠️ Cette dépendance créerait une boucle (une activité ne peut pas dépendre, même indirectement, d'elle-même).")
                                     else:
                                         # Si l'activité a des tâches, on garde la progression/le statut déjà
                                         # calculés automatiquement plutôt que d'écraser avec les champs désactivés.
                                         progression_finale = float(act["progression"] or 0) if a_des_taches else progression_a
                                         statut_final = act["statut"] if a_des_taches else statut_a
-                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_final, budget_a, progression_finale)
+                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_final, budget_a, progression_finale, depend_de_a)
                                         st.toast("✅ Activité mise à jour avec succès.")
                                         st.session_state["editing_act_id"] = None
                                         st.rerun()

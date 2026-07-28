@@ -782,10 +782,19 @@ else:
                         help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt.",
                     )
                     if st.form_submit_button("Ajouter"):
+                        date_fin_predecesseur_a = (
+                            activites_df[activites_df["id"] == depend_de_a].iloc[0]["date_fin"]
+                            if depend_de_a is not None and not activites_df.empty else None
+                        )
                         if not titre_a:
                             st.warning("Le titre est obligatoire.")
                         elif not validators.dates_valides(date_debut_a, date_fin_a):
                             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
+                        elif not validators.depend_coherent(date_debut_a, date_fin_predecesseur_a):
+                            st.warning(
+                                f"⚠️ Cette activité ne peut pas dépendre de « {depend_options[depend_de_a]} », "
+                                f"qui se termine après sa propre date de début. Corrigez les dates ou changez la dépendance."
+                            )
                         else:
                             crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a, depend_de_a)
                             st.session_state.pop("act_suggestions", None)
@@ -853,10 +862,19 @@ else:
 
                                 col_save, col_delete = st.columns(2)
                                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                    date_fin_predecesseur_edit = (
+                                        activites_df[activites_df["id"] == depend_de_a].iloc[0]["date_fin"]
+                                        if depend_de_a is not None else None
+                                    )
                                     if not validators.dates_valides(date_debut_a, date_fin_a):
                                         st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
                                     elif validators.cree_une_boucle(act["id"], depend_de_a, activites_df):
                                         st.warning("⚠️ Cette dépendance créerait une boucle (une activité ne peut pas dépendre, même indirectement, d'elle-même).")
+                                    elif not validators.depend_coherent(date_debut_a, date_fin_predecesseur_edit):
+                                        st.warning(
+                                            f"⚠️ Cette activité ne peut pas dépendre de « {depend_options[depend_de_a]} », "
+                                            f"qui se termine après sa propre date de début. Corrigez les dates ou changez la dépendance."
+                                        )
                                     else:
                                         # Si l'activité a des tâches, on garde la progression/le statut déjà
                                         # calculés automatiquement plutôt que d'écraser avec les champs désactivés.

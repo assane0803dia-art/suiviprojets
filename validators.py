@@ -48,3 +48,15 @@ def cree_une_boucle(activite_id, nouveau_depend_de_id, activites_df):
         vus.add(courant)
         courant = predecesseurs.get(courant)
     return False
+
+
+def depend_coherent(date_debut_activite, date_fin_predecesseur):
+    """
+    False si la date de fin de l'activité dont on dépend est postérieure à la
+    date de début de l'activité qui en dépend — on ne peut pas démarrer avant que
+    son prédécesseur soit terminé. Ignore la vérification si l'une des deux
+    dates n'est pas renseignée (impossible de vérifier dans ce cas).
+    """
+    if date_debut_activite and date_fin_predecesseur and date_fin_predecesseur > date_debut_activite:
+        return False
+    return True

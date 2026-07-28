@@ -775,11 +775,14 @@ else:
                     responsable_id_a = st.selectbox("Responsable", options=list(resp_options.keys()), format_func=lambda x: resp_options[x])
                     depend_options = {None: "— Aucune (activité de départ) —"}
                     for _, a in activites_df.iterrows():
-                        depend_options[a["id"]] = a["titre"]
+                        if not validators.depend_coherent(date_debut_a, a["date_fin"]):
+                            depend_options[a["id"]] = f"⚠️ {a['titre']} (se termine après le début de cette activité)"
+                        else:
+                            depend_options[a["id"]] = f"✅ {a['titre']}"
                     depend_de_a = st.selectbox(
                         "Dépend de (doit démarrer après cette activité)",
                         options=list(depend_options.keys()), format_func=lambda x: depend_options[x],
-                        help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt.",
+                        help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt. Les options marquées ⚠️ seront refusées à l'enregistrement.",
                     )
                     if st.form_submit_button("Ajouter"):
                         date_fin_predecesseur_a = (
@@ -791,8 +794,9 @@ else:
                         elif not validators.dates_valides(date_debut_a, date_fin_a):
                             st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
                         elif not validators.depend_coherent(date_debut_a, date_fin_predecesseur_a):
+                            titre_predecesseur_a = activites_df[activites_df["id"] == depend_de_a].iloc[0]["titre"]
                             st.warning(
-                                f"⚠️ Cette activité ne peut pas dépendre de « {depend_options[depend_de_a]} », "
+                                f"⚠️ Cette activité ne peut pas dépendre de « {titre_predecesseur_a} », "
                                 f"qui se termine après sa propre date de début. Corrigez les dates ou changez la dépendance."
                             )
                         else:
@@ -851,14 +855,20 @@ else:
                                 autres_activites = activites_df[activites_df["id"] != act["id"]] if not activites_df.empty else activites_df
                                 depend_options = {None: "— Aucune (activité de départ) —"}
                                 for _, a2 in autres_activites.iterrows():
-                                    depend_options[a2["id"]] = a2["titre"]
+                                    if validators.cree_une_boucle(act["id"], a2["id"], activites_df):
+                                        depend_options[a2["id"]] = f"⚠️ {a2['titre']} (créerait une boucle)"
+                                    elif not validators.depend_coherent(act["date_debut"], a2["date_fin"]):
+                                        depend_options[a2["id"]] = f"⚠️ {a2['titre']} (se termine après le début de cette activité)"
+                                    else:
+                                        depend_options[a2["id"]] = f"✅ {a2['titre']}"
                                 current_depend = act["depend_de_activite_id"] if act["depend_de_activite_id"] in depend_options else None
                                 depend_de_a = st.selectbox(
                                     "Dépend de (doit démarrer après cette activité)",
                                     options=list(depend_options.keys()), format_func=lambda x: depend_options[x],
                                     index=list(depend_options.keys()).index(current_depend),
-                                    help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt.",
+                                    help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt. Les options marquées ⚠️ seront refusées à l'enregistrement.",
                                 )
+                                st.caption("💡 Basé sur la date de début actuellement enregistrée — si vous modifiez cette date dans le formulaire, les repères ✅/⚠️ ne se mettront à jour qu'après l'enregistrement.")
 
                                 col_save, col_delete = st.columns(2)
                                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
@@ -871,8 +881,9 @@ else:
                                     elif validators.cree_une_boucle(act["id"], depend_de_a, activites_df):
                                         st.warning("⚠️ Cette dépendance créerait une boucle (une activité ne peut pas dépendre, même indirectement, d'elle-même).")
                                     elif not validators.depend_coherent(date_debut_a, date_fin_predecesseur_edit):
+                                        titre_predecesseur = activites_df[activites_df["id"] == depend_de_a].iloc[0]["titre"]
                                         st.warning(
-                                            f"⚠️ Cette activité ne peut pas dépendre de « {depend_options[depend_de_a]} », "
+                                            f"⚠️ Cette activité ne peut pas dépendre de « {titre_predecesseur} », "
                                             f"qui se termine après sa propre date de début. Corrigez les dates ou changez la dépendance."
                                         )
                                     else:
@@ -1282,4 +1293,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

@@ -144,6 +144,10 @@ def login_form():
 
     inject_global_style()
 
+    _, col_logo, _ = st.columns([1, 1, 1])
+    with col_logo:
+        st.image("assets/logo_complet.png", use_container_width=True)
+
     st.markdown(
         "<h2 style='text-align:center;'>🔒 Connexion</h2>",
         unsafe_allow_html=True,

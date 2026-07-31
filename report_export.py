@@ -5,11 +5,14 @@ en fichiers Word (.docx) et PDF téléchargeables — avec une vraie mise en for
 """
 
 import io
+import os
 import re
 from xml.sax.saxutils import escape
 from docx import Document
+from docx.shared import Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 
@@ -87,6 +90,13 @@ def to_display_markdown(text: str) -> str:
 
 def export_to_docx(report_text: str, projet_nom: str) -> bytes:
     doc = Document()
+
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_complet.png")
+    if os.path.exists(logo_path):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.add_run().add_picture(logo_path, width=Inches(2.2))
+
     doc.add_heading(f"Rapport d'exécution — {projet_nom}", level=0)
 
     for kind, text in _parse_lines(report_text):
@@ -118,7 +128,16 @@ def export_to_pdf(report_text: str, projet_nom: str) -> bytes:
     bullet_style = ParagraphStyle("BulletCustom", parent=styles["Normal"], leftIndent=14, spaceAfter=4)
     normal_style = ParagraphStyle("NormalCustom", parent=styles["Normal"], spaceAfter=6)
 
-    story = [Paragraph(escape(f"Rapport d'exécution — {projet_nom}"), title_style), Spacer(1, 6)]
+    story = []
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_complet.png")
+    if os.path.exists(logo_path):
+        logo_img = RLImage(logo_path, width=5 * cm, height=5 * cm * 0.71)
+        logo_img.hAlign = "CENTER"
+        story.append(logo_img)
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph(escape(f"Rapport d'exécution — {projet_nom}"), title_style))
+    story.append(Spacer(1, 6))
 
     for kind, text in _parse_lines(report_text):
         if kind in ("h1", "h2"):

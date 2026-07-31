@@ -1,7 +1,7 @@
 import streamlit as st
 from i18n import t
 
-st.set_page_config(page_title="SuiviProjets", page_icon="📊", layout="wide")
+st.set_page_config(page_title="SuiviProjets", page_icon="assets/logo_icone.png", layout="wide")
 
 pg = st.navigation([
     st.Page("vue_dashboard.py", title=t("nav_dashboard"), icon="🏠", default=True),

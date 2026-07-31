@@ -295,13 +295,19 @@ def ai_text_field(label, key, contexte="", height=None, is_area=True, boutons=No
 
 def sidebar_brand():
     with st.sidebar:
-        st.markdown(
-            f"""<div style="padding: 10px 4px 16px 4px; margin-bottom: 4px;">
-                    <span style="font-size:1.35rem; font-weight:800; color:{TEXT};">📊 SuiviProjets</span><br>
-                    <span style="font-size:0.8rem; color:{MUTED};">Gestion &amp; suivi de projets</span>
-                </div>""",
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+        col_logo, col_text = st.columns([1, 3], vertical_alignment="center")
+        with col_logo:
+            st.image("assets/logo_icone.png", width=42)
+        with col_text:
+            st.markdown(
+                f"""<div style="padding-bottom: 2px;">
+                        <span style="font-size:1.25rem; font-weight:800; color:{TEXT};">SuiviProjets</span><br>
+                        <span style="font-size:0.75rem; color:{MUTED};">Gestion &amp; suivi de projets</span>
+                    </div>""",
+                unsafe_allow_html=True,
+            )
+        st.write("")
         st.divider()
 
 

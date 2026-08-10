@@ -411,9 +411,9 @@ if is_lecteur:
         taux_execution_ro = (depense_reelle_ro / reference_ro * 100) if reference_ro else 0.0
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Budget global du projet", f"{budget_projet_ro:,.0f} FCFA".replace(",", " "))
-        c2.metric("Budget prévisionnel de référence", f"{reference_ro:,.0f} {devise_p_ro}".replace(",", " "))
-        c3.metric("Dépensé réellement", f"{depense_reelle_ro:,.0f} FCFA".replace(",", " "), delta=f"{taux_execution_ro:.0f}% exécuté")
+        c1.metric("Budget global du projet", f"{budget_projet_ro:,.0f} {devise_p_ro}".replace(",", " "))
+        c2.metric("Budget prévisionnel", f"{reference_ro:,.0f} {devise_p_ro}".replace(",", " "))
+        c3.metric("Dépensé réellement", f"{depense_reelle_ro:,.0f} {devise_p_ro}".replace(",", " "), delta=f"{taux_execution_ro:.0f}% exécuté")
 
         if not lignes_budget_ro.empty:
             st.write("")
@@ -427,7 +427,7 @@ if is_lecteur:
             st.markdown("**Détail par activité**")
             st.dataframe(
                 activites_df[["resultat_titre", "titre", "budget"]].rename(
-                    columns={"resultat_titre": "Résultat", "titre": "Activité", "budget": "Budget (FCFA)"}
+                    columns={"resultat_titre": "Résultat", "titre": "Activité", "budget": f"Budget ({devise_p_ro})"}
                 ),
                 use_container_width=True, hide_index=True,
             )
@@ -1331,11 +1331,11 @@ else:
 
         st.markdown("**💳 Exécution financière (dépenses réelles vs budget prévisionnel)**")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Budget global du projet", f"{budget_projet:,.0f} FCFA".replace(",", " "))
-        c2.metric("Budget prévisionnel de référence", f"{reference_budget:,.0f} {devise_p}".replace(",", " "))
-        c3.metric("Dépensé réellement", f"{depense_reelle_totale:,.0f} FCFA".replace(",", " "))
-        c4.metric("Solde disponible", f"{ecart_total:,.0f}".replace(",", " "), delta=f"{taux_execution_total:.0f}% exécuté", delta_color="inverse" if ecart_total < 0 else "normal")
-        st.caption("💡 Le budget prévisionnel de référence utilise le total des rubriques détaillées ci-dessus si renseigné, sinon la somme des budgets par activité (ancien système).")
+        c1.metric("Budget global du projet", f"{budget_projet:,.0f} {devise_p}".replace(",", " "))
+        c2.metric("Budget prévisionnel", f"{reference_budget:,.0f} {devise_p}".replace(",", " "))
+        c3.metric("Dépensé réellement", f"{depense_reelle_totale:,.0f} {devise_p}".replace(",", " "))
+        c4.metric("Solde disponible", f"{ecart_total:,.0f} {devise_p}".replace(",", " "), delta=f"{taux_execution_total:.0f}% exécuté", delta_color="inverse" if ecart_total < 0 else "normal")
+        st.caption("💡 Le budget prévisionnel de référence utilise le total des rubriques détaillées ci-dessus si renseigné, sinon la somme des budgets par activité (ancien système). Toutes les dépenses sont supposées dans la même devise que le budget global.")
 
         if budget_active > budget_projet and budget_projet > 0:
             st.warning("⚠️ La somme des budgets d'activités dépasse le budget global du projet.")
@@ -1369,9 +1369,9 @@ else:
 
                 with st.expander(f"{act_budget['titre']} — {taux_act:.0f}% exécuté"):
                     fc1, fc2, fc3 = st.columns(3)
-                    fc1.metric("Prévu", f"{budget_prevu_act:,.0f} FCFA".replace(",", " "))
-                    fc2.metric("Dépensé", f"{depense_act:,.0f} FCFA".replace(",", " "))
-                    fc3.metric("Écart", f"{ecart_act:,.0f} FCFA".replace(",", " "))
+                    fc1.metric("Prévu", f"{budget_prevu_act:,.0f} {devise_p}".replace(",", " "))
+                    fc2.metric("Dépensé", f"{depense_act:,.0f} {devise_p}".replace(",", " "))
+                    fc3.metric("Écart", f"{ecart_act:,.0f} {devise_p}".replace(",", " "))
 
                     if not depenses_act.empty:
                         st.dataframe(
@@ -1512,4 +1512,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

@@ -381,6 +381,30 @@ def get_activites_by_projet(projet_id):
 
 
 @st.cache_data(ttl=15)
+def get_performance_responsables(projet_id):
+    """
+    Performance moyenne de chaque responsable = moyenne de la progression de ses
+    activités assignées dans ce projet. Les responsables sans aucune activité
+    assignée n'apparaissent pas (pas de performance artificielle à 0%).
+    """
+    return run_query("""
+        SELECT U.id AS responsable_id, U.nom AS responsable,
+               COUNT(A.id) AS nb_activites,
+               AVG(A.progression) AS performance_moyenne,
+               SUM(CASE WHEN A.statut = 'Terminé' THEN 1 ELSE 0 END) AS nb_terminees,
+               SUM(CASE WHEN A.statut = 'En cours' THEN 1 ELSE 0 END) AS nb_en_cours,
+               SUM(CASE WHEN A.date_fin < CURRENT_DATE AND A.statut != 'Terminé' THEN 1 ELSE 0 END) AS nb_en_retard
+        FROM Utilisateurs U
+        JOIN Activites A ON A.responsable_id = U.id
+        JOIN Resultats R ON A.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        WHERE O.projet_id = %s
+        GROUP BY U.id, U.nom
+        ORDER BY performance_moyenne DESC
+    """, params=(projet_id,))
+
+
+@st.cache_data(ttl=15)
 def get_taches_by_projet(projet_id):
     return run_query("""
         SELECT T.id, T.titre, T.description, T.priorite, T.statut, T.progression, T.date_debut, T.date_fin,

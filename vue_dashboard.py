@@ -237,6 +237,45 @@ else:
 st.divider()
 
 # ----------------------------------------------------------------------------
+# Performance des responsables
+# ----------------------------------------------------------------------------
+section_title("🏆", "Performance des responsables")
+tip("performance_responsables", "La performance d'un responsable est la moyenne de la progression de toutes ses activités assignées dans ce projet. Les responsables sans activité ne sont pas affichés.")
+
+perf_df = crud.get_performance_responsables(selected_projet_id)
+
+if perf_df.empty:
+    st.info("Aucun responsable n'a d'activité assignée pour l'instant dans ce projet.")
+else:
+    perf_df = perf_df.sort_values("performance_moyenne", ascending=True)
+    perf_df["performance_moyenne"] = perf_df["performance_moyenne"].round(1)
+
+    fig_perf = px.bar(
+        perf_df, x="performance_moyenne", y="responsable", orientation="h",
+        text_auto=".0f", color_discrete_sequence=["#2563EB"],
+        custom_data=["nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard"],
+    )
+    fig_perf.update_traces(
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Performance moyenne : %{x:.0f}%<br>"
+            "Activités assignées : %{customdata[0]}<br>"
+            "Terminées : %{customdata[1]} · En cours : %{customdata[2]} · En retard : %{customdata[3]}"
+            "<extra></extra>"
+        )
+    )
+    style_plotly_chart(fig_perf)
+    fig_perf.update_layout(
+        xaxis_title="Performance moyenne (%)", yaxis_title="",
+        xaxis_range=[0, 100],
+        margin=dict(l=10, r=10, t=20, b=10), height=max(200, 45 * len(perf_df)),
+        showlegend=False,
+    )
+    st.plotly_chart(fig_perf, use_container_width=True)
+
+st.divider()
+
+# ----------------------------------------------------------------------------
 # Détail lisible du projet sélectionné (activités)
 # ----------------------------------------------------------------------------
 section_title("📋", f"Détail des activités — {projet_row['nom']}")

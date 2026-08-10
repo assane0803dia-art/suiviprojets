@@ -298,12 +298,12 @@ else:
 st.divider()
 
 # ----------------------------------------------------------------------------
-# Export pour Power BI / analyse externe (toujours sur l'ensemble des projets)
+# Export pour analyse externe (Excel, Power BI, etc.) — toujours sur l'ensemble des projets
 # ----------------------------------------------------------------------------
-section_title("📥", "Exporter pour Power BI")
+section_title("📥", "Exporter pour Excel / Power BI")
 st.caption(
     "Téléchargez les données de tous vos projets sous forme de tables reliées (par identifiants), "
-    "prêtes à être importées dans Power BI, Excel ou tout autre outil d'analyse."
+    "prêtes à être importées dans Excel, Power BI ou tout autre outil d'analyse."
 )
 
 if st.button("📥 Générer l'export (ZIP de fichiers CSV)", type="primary"):
@@ -323,20 +323,26 @@ if st.button("📥 Générer l'export (ZIP de fichiers CSV)", type="primary"):
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for filename, table_df in tables.items():
             zf.writestr(filename, table_df.to_csv(index=False))
-    st.session_state["powerbi_export"] = buffer.getvalue()
+    st.session_state["export_analyse_externe"] = buffer.getvalue()
 
-if "powerbi_export" in st.session_state:
+if "export_analyse_externe" in st.session_state:
     st.download_button(
         "⬇️ Télécharger l'export (.zip)",
-        data=st.session_state["powerbi_export"],
-        file_name="suiviprojets_export_powerbi.zip",
+        data=st.session_state["export_analyse_externe"],
+        file_name="suiviprojets_export.zip",
         mime="application/zip",
     )
 
-with st.expander("ℹ️ Comment importer ça dans Power BI"):
+with st.expander("ℹ️ Comment utiliser cet export"):
     st.markdown("""
+**Dans Excel :**
 1. Décompressez le fichier `.zip` téléchargé.
-2. Dans Power BI Desktop : **Accueil → Obtenir les données → Texte/CSV**, importez les 6 fichiers un par un.
+2. Ouvrez chaque fichier `.csv` directement dans Excel (double-clic), ou importez-les via **Données → À partir d'un fichier texte/CSV**.
+3. Pour relier les tables entre elles, utilisez les colonnes d'identifiants (`projet_id`, `objectif_id`, etc.) avec RECHERCHEV ou le modèle de données Excel (Power Pivot).
+
+**Dans Power BI :**
+1. Décompressez le fichier `.zip` téléchargé.
+2. **Accueil → Obtenir les données → Texte/CSV**, importez les 6 fichiers un par un.
 3. Dans **Gérer les relations**, reliez les tables par leurs colonnes d'identifiants.
 4. Construisez vos visuels normalement — toutes les tables sont désormais reliées.
     """)

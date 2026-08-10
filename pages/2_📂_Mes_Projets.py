@@ -381,16 +381,29 @@ if is_lecteur:
     elif active == "budget":
         section_title("💰", "Budget du projet")
         tip("budget_fixe_variable", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
+
+        devise_p_ro = projet_row["devise_principale"] or "XOF"
+        lignes_budget_ro = crud.get_budget_lignes_by_projet(selected_projet_id)
+        total_hierarchique_ro = float(lignes_budget_ro["cout_total"].sum()) if not lignes_budget_ro.empty else 0.0
+
         budget_projet_ro = float(projet_row["budget"] or 0)
         budget_active_ro = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0
         depenses_projet_ro = crud.get_depenses_by_projet(selected_projet_id)
         depense_reelle_ro = float(depenses_projet_ro["montant"].sum()) if not depenses_projet_ro.empty else 0.0
-        taux_execution_ro = (depense_reelle_ro / budget_active_ro * 100) if budget_active_ro else 0.0
+        reference_ro = total_hierarchique_ro if total_hierarchique_ro > 0 else budget_active_ro
+        taux_execution_ro = (depense_reelle_ro / reference_ro * 100) if reference_ro else 0.0
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Budget global du projet", f"{budget_projet_ro:,.0f} FCFA".replace(",", " "))
-        c2.metric("Prévu (activités)", f"{budget_active_ro:,.0f} FCFA".replace(",", " "))
+        c2.metric("Budget prévisionnel de référence", f"{reference_ro:,.0f} {devise_p_ro}".replace(",", " "))
         c3.metric("Dépensé réellement", f"{depense_reelle_ro:,.0f} FCFA".replace(",", " "), delta=f"{taux_execution_ro:.0f}% exécuté")
+
+        if not lignes_budget_ro.empty:
+            st.write("")
+            st.markdown("**Budget prévisionnel détaillé par rubrique**")
+            recap_rubriques = lignes_budget_ro.groupby("rubrique_nom")["cout_total"].sum().reset_index()
+            recap_rubriques.columns = ["Rubrique", f"Total ({devise_p_ro})"]
+            st.dataframe(recap_rubriques, use_container_width=True, hide_index=True)
 
         if not activites_df.empty:
             st.write("")
@@ -1105,23 +1118,212 @@ else:
         section_title("💰", "Budget du projet")
         tip("budget_fixe_variable_2", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
 
+        devise_p = projet_row["devise_principale"] or "XOF"
+        devise_s = projet_row["devise_secondaire"] or "EUR"
+        taux_conv = float(projet_row["taux_conversion"] or 1)
+
+        with st.expander(f"💱 Devise du projet ({devise_p} → {devise_s}, taux actuel : 1 {devise_s} = {taux_conv:,.2f} {devise_p})".replace(",", " ")):
+            with st.form("form_devise_projet"):
+                dc1, dc2, dc3 = st.columns(3)
+                nouvelle_devise_p = dc1.text_input("Devise principale", value=devise_p, help="Ex: XOF, GMD, USD...")
+                nouvelle_devise_s = dc2.text_input("Devise secondaire", value=devise_s, help="Ex: EUR, USD...")
+                nouveau_taux = dc3.number_input(f"1 {nouvelle_devise_s} = combien de {nouvelle_devise_p} ?", min_value=0.000001, value=taux_conv, step=0.01, format="%.4f")
+                st.caption("Modifier le taux ne change aucun montant déjà enregistré dans la devise principale — seule la conversion affichée change.")
+                if st.form_submit_button("💾 Enregistrer", use_container_width=True):
+                    crud.update_devise_projet(selected_projet_id, nouvelle_devise_p.upper(), nouvelle_devise_s.upper(), nouveau_taux)
+                    st.toast("✅ Configuration devise mise à jour avec succès.")
+                    st.rerun()
+
+        # ------------------------------------------------------------------------
+        # Budget prévisionnel détaillé (Rubriques → Sous-rubriques → Lignes)
+        # ------------------------------------------------------------------------
+        st.write("")
+        st.markdown("**📊 Budget prévisionnel détaillé**")
+
+        lignes_budget_df = crud.get_budget_lignes_by_projet(selected_projet_id)
+        rubriques_df = crud.get_budget_rubriques(selected_projet_id)
+
+        total_hierarchique = float(lignes_budget_df["cout_total"].sum()) if not lignes_budget_df.empty else 0.0
+        total_hierarchique_secondaire = (total_hierarchique / taux_conv) if taux_conv else 0.0
+
+        tc1, tc2 = st.columns(2)
+        tc1.metric(f"Budget prévisionnel total ({devise_p})", f"{total_hierarchique:,.0f}".replace(",", " "))
+        tc2.metric(f"Équivalent ({devise_s})", f"{total_hierarchique_secondaire:,.2f}".replace(",", " "))
+
+        with st.expander("➕ Ajouter une rubrique"):
+            with st.form("form_new_rubrique", clear_on_submit=True):
+                nom_rub = st.text_input("Nom de la rubrique *", placeholder="ex: RH, Équipements, Transport...")
+                rc1, rc2 = st.columns(2)
+                desc_rub = rc1.text_input("Description (facultatif)")
+                code_rub = rc2.text_input("Code budgétaire (facultatif)")
+                if st.form_submit_button("Ajouter", use_container_width=True):
+                    if not nom_rub:
+                        st.warning("Le nom de la rubrique est obligatoire.")
+                    else:
+                        crud.create_budget_rubrique(selected_projet_id, nom_rub, desc_rub, code_rub)
+                        st.toast(f"✅ Rubrique « {nom_rub} » ajoutée avec succès.")
+                        st.rerun()
+
+        if rubriques_df.empty:
+            st.info("Aucune rubrique budgétaire pour l'instant. Commencez par en ajouter une ci-dessus (ex: RH, Équipements, Transport).")
+        else:
+            for _, rubrique in rubriques_df.iterrows():
+                lignes_rubrique = lignes_budget_df[lignes_budget_df["rubrique_id"] == rubrique["id"]] if not lignes_budget_df.empty else lignes_budget_df
+                total_rubrique = float(lignes_rubrique["cout_total"].sum()) if not lignes_rubrique.empty else 0.0
+
+                with st.expander(f"📁 {rubrique['nom']} — {total_rubrique:,.0f} {devise_p}".replace(",", " ")):
+                    if rubrique["description"] or rubrique["code_budgetaire"]:
+                        st.caption(f"{rubrique['description'] or ''} {'· Code : ' + rubrique['code_budgetaire'] if rubrique['code_budgetaire'] else ''}")
+
+                    rbc1, rbc2 = st.columns(2)
+                    if rbc1.button("✏️ Modifier / Supprimer la rubrique", key=f"toggle_edit_rub_{rubrique['id']}", use_container_width=True):
+                        st.session_state["editing_rubrique_id"] = None if st.session_state.get("editing_rubrique_id") == rubrique["id"] else rubrique["id"]
+                        st.rerun()
+
+                    if st.session_state.get("editing_rubrique_id") == rubrique["id"]:
+                        with st.form(f"form_edit_rub_{rubrique['id']}"):
+                            nom_rub_edit = st.text_input("Nom", value=rubrique["nom"])
+                            erc1, erc2 = st.columns(2)
+                            desc_rub_edit = erc1.text_input("Description", value=rubrique["description"] or "")
+                            code_rub_edit = erc2.text_input("Code budgétaire", value=rubrique["code_budgetaire"] or "")
+                            esave, edel = st.columns(2)
+                            if esave.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                crud.update_budget_rubrique(rubrique["id"], nom_rub_edit, desc_rub_edit, code_rub_edit)
+                                st.toast("✅ Rubrique mise à jour avec succès.")
+                                st.session_state["editing_rubrique_id"] = None
+                                st.rerun()
+                            if edel.form_submit_button("🗑️ Supprimer la rubrique", use_container_width=True):
+                                crud.delete_budget_rubrique(rubrique["id"])
+                                st.warning("Rubrique supprimée (ainsi que ses sous-rubriques et lignes).")
+                                st.session_state["editing_rubrique_id"] = None
+                                st.rerun()
+
+                    st.divider()
+
+                    sous_rubriques_df = crud.get_budget_sous_rubriques(rubrique["id"])
+
+                    if sous_rubriques_df.empty:
+                        st.caption("Aucune sous-rubrique pour l'instant.")
+                    else:
+                        for _, sr in sous_rubriques_df.iterrows():
+                            lignes_sr = lignes_rubrique[lignes_rubrique["sous_rubrique_id"] == sr["id"]] if not lignes_rubrique.empty else lignes_rubrique
+                            total_sr = float(lignes_sr["cout_total"].sum()) if not lignes_sr.empty else 0.0
+
+                            with st.container(border=True):
+                                st.markdown(f"**📂 {sr['nom']} — {total_sr:,.0f} {devise_p}**".replace(",", " "))
+
+                                if not lignes_sr.empty:
+                                    for _, ligne in lignes_sr.iterrows():
+                                        lc1, lc2 = st.columns([5, 1])
+                                        with lc1:
+                                            rattachement = f" · rattachée à « {ligne['activite_titre']} »" if ligne["activite_titre"] else ""
+                                            st.write(f"• {ligne['description']} — {ligne['quantite']:.0f} {ligne['unite']} × {ligne['cout_unitaire']:,.0f} = **{ligne['cout_total']:,.0f} {devise_p}**{rattachement}".replace(",", " "))
+                                        with lc2:
+                                            if st.button("✏️", key=f"edit_ligne_btn_{ligne['id']}", use_container_width=True, help="Modifier / supprimer"):
+                                                st.session_state["editing_ligne_id"] = None if st.session_state.get("editing_ligne_id") == ligne["id"] else ligne["id"]
+                                                st.rerun()
+
+                                        if st.session_state.get("editing_ligne_id") == ligne["id"]:
+                                            with st.form(f"form_edit_ligne_{ligne['id']}"):
+                                                desc_ligne_e = st.text_input("Description *", value=ligne["description"])
+                                                lec1, lec2, lec3 = st.columns(3)
+                                                unite_options = crud.UNITES_BUDGET
+                                                unite_idx = unite_options.index(ligne["unite"]) if ligne["unite"] in unite_options else len(unite_options) - 1
+                                                unite_e = lec1.selectbox("Unité", unite_options, index=unite_idx, key=f"unite_e_{ligne['id']}")
+                                                if unite_e == "autre":
+                                                    unite_e = lec1.text_input("Préciser l'unité", value=ligne["unite"], key=f"unite_e_libre_{ligne['id']}")
+                                                quantite_e = lec2.number_input("Quantité", min_value=0.0, value=float(ligne["quantite"]), key=f"qte_e_{ligne['id']}")
+                                                cout_e = lec3.number_input(f"Coût unitaire ({devise_p})", min_value=0.0, value=float(ligne["cout_unitaire"]), key=f"cout_e_{ligne['id']}")
+                                                act_options_ligne = {None: "— Aucune —"}
+                                                for _, a in activites_df.iterrows():
+                                                    act_options_ligne[a["id"]] = a["titre"]
+                                                current_act = ligne["activite_id"] if ligne["activite_id"] in act_options_ligne else None
+                                                activite_liee_e = st.selectbox(
+                                                    "Activité associée (facultatif)", options=list(act_options_ligne.keys()),
+                                                    format_func=lambda x: act_options_ligne[x],
+                                                    index=list(act_options_ligne.keys()).index(current_act),
+                                                    key=f"act_e_{ligne['id']}",
+                                                )
+                                                lsave, ldel = st.columns(2)
+                                                if lsave.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                                    if not desc_ligne_e or not unite_e:
+                                                        st.warning("La description et l'unité sont obligatoires.")
+                                                    else:
+                                                        crud.update_budget_ligne(ligne["id"], desc_ligne_e, unite_e, quantite_e, cout_e, activite_liee_e)
+                                                        st.toast("✅ Ligne mise à jour avec succès.")
+                                                        st.session_state["editing_ligne_id"] = None
+                                                        st.rerun()
+                                                if ldel.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                                    crud.delete_budget_ligne(ligne["id"])
+                                                    st.warning("Ligne budgétaire supprimée.")
+                                                    st.session_state["editing_ligne_id"] = None
+                                                    st.rerun()
+                                else:
+                                    st.caption("Aucune ligne pour l'instant.")
+
+                                with st.form(f"form_new_ligne_{sr['id']}", clear_on_submit=True):
+                                    st.caption("➕ Ajouter une ligne")
+                                    desc_ligne = st.text_input("Description *", key=f"desc_new_ligne_{sr['id']}")
+                                    nlc1, nlc2, nlc3 = st.columns(3)
+                                    unite_ligne = nlc1.selectbox("Unité *", crud.UNITES_BUDGET, key=f"unite_new_{sr['id']}")
+                                    if unite_ligne == "autre":
+                                        unite_ligne = nlc1.text_input("Préciser l'unité", key=f"unite_new_libre_{sr['id']}")
+                                    quantite_ligne = nlc2.number_input("Quantité *", min_value=0.0, value=1.0, key=f"qte_new_{sr['id']}")
+                                    cout_ligne = nlc3.number_input(f"Coût unitaire ({devise_p}) *", min_value=0.0, key=f"cout_new_{sr['id']}")
+                                    act_options_new = {None: "— Aucune —"}
+                                    for _, a in activites_df.iterrows():
+                                        act_options_new[a["id"]] = a["titre"]
+                                    activite_liee_new = st.selectbox(
+                                        "Activité associée (facultatif)", options=list(act_options_new.keys()),
+                                        format_func=lambda x: act_options_new[x], key=f"act_new_{sr['id']}",
+                                    )
+                                    if st.form_submit_button("Ajouter la ligne", use_container_width=True):
+                                        if not desc_ligne or not unite_ligne:
+                                            st.warning("La description et l'unité sont obligatoires.")
+                                        else:
+                                            crud.create_budget_ligne(sr["id"], desc_ligne, unite_ligne, quantite_ligne, cout_ligne, activite_liee_new)
+                                            st.toast("✅ Ligne budgétaire ajoutée avec succès.")
+                                            st.rerun()
+
+                    with st.form(f"form_new_sous_rubrique_{rubrique['id']}", clear_on_submit=True):
+                        st.caption("➕ Ajouter une sous-rubrique")
+                        nom_sr = st.text_input("Nom de la sous-rubrique *", key=f"nom_new_sr_{rubrique['id']}")
+                        if st.form_submit_button("Ajouter", use_container_width=True):
+                            if not nom_sr:
+                                st.warning("Le nom est obligatoire.")
+                            else:
+                                crud.create_budget_sous_rubrique(rubrique["id"], nom_sr)
+                                st.toast(f"✅ Sous-rubrique « {nom_sr} » ajoutée avec succès.")
+                                st.rerun()
+
+        st.divider()
+
+        # ------------------------------------------------------------------------
+        # Exécution financière (dépenses réelles) — système existant, inchangé
+        # ------------------------------------------------------------------------
         budget_projet = float(projet_row["budget"] or 0)
         budget_active = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0
         depenses_projet_df = crud.get_depenses_by_projet(selected_projet_id)
         depense_reelle_totale = float(depenses_projet_df["montant"].sum()) if not depenses_projet_df.empty else 0.0
-        ecart_total = budget_active - depense_reelle_totale
-        taux_execution_total = (depense_reelle_totale / budget_active * 100) if budget_active else 0.0
 
+        # Solde et taux d'exécution calculés sur le budget prévisionnel hiérarchique
+        # (référence la plus précise), pas sur l'ancien total par activité.
+        reference_budget = total_hierarchique if total_hierarchique > 0 else budget_active
+        ecart_total = reference_budget - depense_reelle_totale
+        taux_execution_total = (depense_reelle_totale / reference_budget * 100) if reference_budget else 0.0
+
+        st.markdown("**💳 Exécution financière (dépenses réelles vs budget prévisionnel)**")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Budget global du projet", f"{budget_projet:,.0f} FCFA".replace(",", " "))
-        c2.metric("Prévu (activités)", f"{budget_active:,.0f} FCFA".replace(",", " "))
+        c2.metric("Budget prévisionnel de référence", f"{reference_budget:,.0f} {devise_p}".replace(",", " "))
         c3.metric("Dépensé réellement", f"{depense_reelle_totale:,.0f} FCFA".replace(",", " "))
-        c4.metric("Écart", f"{ecart_total:,.0f} FCFA".replace(",", " "), delta=f"{taux_execution_total:.0f}% exécuté", delta_color="inverse" if ecart_total < 0 else "normal")
+        c4.metric("Solde disponible", f"{ecart_total:,.0f}".replace(",", " "), delta=f"{taux_execution_total:.0f}% exécuté", delta_color="inverse" if ecart_total < 0 else "normal")
+        st.caption("💡 Le budget prévisionnel de référence utilise le total des rubriques détaillées ci-dessus si renseigné, sinon la somme des budgets par activité (ancien système).")
 
         if budget_active > budget_projet and budget_projet > 0:
             st.warning("⚠️ La somme des budgets d'activités dépasse le budget global du projet.")
-        if depense_reelle_totale > budget_active and budget_active > 0:
-            st.warning("⚠️ Les dépenses réelles dépassent le budget prévu des activités — dépassement à surveiller.")
+        if depense_reelle_totale > reference_budget and reference_budget > 0:
+            st.warning("⚠️ Les dépenses réelles dépassent le budget prévisionnel — dépassement à surveiller.")
 
         with st.expander("✏️ Modifier le budget global du projet"):
             with st.form("form_edit_budget"):
@@ -1293,3 +1495,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

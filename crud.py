@@ -87,7 +87,8 @@ def delete_utilisateur(id):
 def get_projets():
     return run_query("""
         SELECT P.id, P.nom, P.description, P.date_debut, P.date_fin, P.budget, P.statut,
-               P.responsable_id, U.nom AS responsable
+               P.responsable_id, U.nom AS responsable,
+               P.devise_principale, P.devise_secondaire, P.taux_conversion
         FROM Projets P
         LEFT JOIN Utilisateurs U ON P.responsable_id = U.id
         ORDER BY P.nom
@@ -120,6 +121,14 @@ def update_projet(id, nom, description, date_debut, date_fin, budget, statut, re
         "UPDATE Projets SET nom=%s, description=%s, date_debut=%s, date_fin=%s, budget=%s, statut=%s, responsable_id=%s "
         "WHERE id=%s",
         (nom, description, date_debut, date_fin, budget, statut, responsable_id, id),
+    )
+    get_projets.clear()
+
+
+def update_devise_projet(id, devise_principale, devise_secondaire, taux_conversion):
+    run_execute(
+        "UPDATE Projets SET devise_principale=%s, devise_secondaire=%s, taux_conversion=%s WHERE id=%s",
+        (devise_principale, devise_secondaire, taux_conversion, id),
     )
     get_projets.clear()
 
@@ -431,7 +440,8 @@ def get_projets_accessibles(user_id):
     """Projets qu'un compte lecteur est autorisé à consulter."""
     return run_query("""
         SELECT P.id, P.nom, P.description, P.date_debut, P.date_fin, P.budget, P.statut,
-               P.responsable_id, U.nom AS responsable
+               P.responsable_id, U.nom AS responsable,
+               P.devise_principale, P.devise_secondaire, P.taux_conversion
         FROM Projets P
         JOIN Acces_Lecteurs AL ON P.id = AL.projet_id
         LEFT JOIN Utilisateurs U ON P.responsable_id = U.id
@@ -590,6 +600,122 @@ def update_indicateur_supplementaire(id, nom, valeur_cible, valeur_actuelle, uni
 def delete_indicateur_supplementaire(id):
     run_execute("DELETE FROM Indicateurs_Supplementaires WHERE id=%s", (id,))
     get_indicateurs_supplementaires_by_projet.clear()
+
+
+# ----------------------------------------------------------------------------
+# Budget hiérarchique — Rubriques → Sous-rubriques → Lignes budgétaires
+# (budget prévisionnel détaillé, configurable librement par l'utilisateur)
+# ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
+def get_budget_lignes_by_projet(projet_id):
+    """
+    Toutes les lignes budgétaires d'un projet, à plat, avec le contexte complet
+    (rubrique, sous-rubrique, activité éventuellement associée) et le coût total
+    déjà calculé (quantité × coût unitaire) — jamais stocké, toujours recalculé.
+    """
+    return run_query("""
+        SELECT L.id, L.description, L.unite, L.quantite, L.cout_unitaire,
+               (L.quantite * L.cout_unitaire) AS cout_total,
+               L.activite_id, A.titre AS activite_titre,
+               SR.id AS sous_rubrique_id, SR.nom AS sous_rubrique_nom, SR.ordre AS sous_rubrique_ordre,
+               R.id AS rubrique_id, R.nom AS rubrique_nom, R.ordre AS rubrique_ordre
+        FROM Budget_Lignes L
+        JOIN Budget_Sous_Rubriques SR ON L.sous_rubrique_id = SR.id
+        JOIN Budget_Rubriques R ON SR.rubrique_id = R.id
+        LEFT JOIN Activites A ON L.activite_id = A.id
+        WHERE R.projet_id = %s
+        ORDER BY R.ordre, R.nom, SR.ordre, SR.nom, L.ordre, L.description
+    """, params=(projet_id,))
+
+
+@st.cache_data(ttl=15)
+def get_budget_rubriques(projet_id):
+    return run_query(
+        "SELECT id, nom, description, code_budgetaire, ordre FROM Budget_Rubriques "
+        "WHERE projet_id = %s ORDER BY ordre, nom",
+        params=(projet_id,),
+    )
+
+
+@st.cache_data(ttl=15)
+def get_budget_sous_rubriques(rubrique_id):
+    return run_query(
+        "SELECT id, nom, ordre FROM Budget_Sous_Rubriques WHERE rubrique_id = %s ORDER BY ordre, nom",
+        params=(rubrique_id,),
+    )
+
+
+def create_budget_rubrique(projet_id, nom, description, code_budgetaire):
+    new_id = run_execute(
+        "INSERT INTO Budget_Rubriques (projet_id, nom, description, code_budgetaire) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (projet_id, nom, description, code_budgetaire),
+    )
+    get_budget_rubriques.clear()
+    return new_id
+
+
+def update_budget_rubrique(id, nom, description, code_budgetaire):
+    run_execute(
+        "UPDATE Budget_Rubriques SET nom=%s, description=%s, code_budgetaire=%s WHERE id=%s",
+        (nom, description, code_budgetaire, id),
+    )
+    get_budget_rubriques.clear()
+
+
+def delete_budget_rubrique(id):
+    sous_rubriques = run_query("SELECT id FROM Budget_Sous_Rubriques WHERE rubrique_id=%s", params=(id,))
+    for sr_id in sous_rubriques["id"]:
+        delete_budget_sous_rubrique(sr_id)
+    run_execute("DELETE FROM Budget_Rubriques WHERE id=%s", (id,))
+    get_budget_rubriques.clear()
+
+
+def create_budget_sous_rubrique(rubrique_id, nom):
+    new_id = run_execute(
+        "INSERT INTO Budget_Sous_Rubriques (rubrique_id, nom) VALUES (%s, %s) RETURNING id",
+        (rubrique_id, nom),
+    )
+    get_budget_sous_rubriques.clear()
+    return new_id
+
+
+def update_budget_sous_rubrique(id, nom):
+    run_execute("UPDATE Budget_Sous_Rubriques SET nom=%s WHERE id=%s", (nom, id))
+    get_budget_sous_rubriques.clear()
+
+
+def delete_budget_sous_rubrique(id):
+    run_execute("DELETE FROM Budget_Lignes WHERE sous_rubrique_id=%s", (id,))
+    run_execute("DELETE FROM Budget_Sous_Rubriques WHERE id=%s", (id,))
+    get_budget_sous_rubriques.clear()
+    get_budget_lignes_by_projet.clear()
+
+
+def create_budget_ligne(sous_rubrique_id, description, unite, quantite, cout_unitaire, activite_id=None):
+    new_id = run_execute(
+        "INSERT INTO Budget_Lignes (sous_rubrique_id, description, unite, quantite, cout_unitaire, activite_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+        (sous_rubrique_id, description, unite, quantite, cout_unitaire, activite_id),
+    )
+    get_budget_lignes_by_projet.clear()
+    return new_id
+
+
+def update_budget_ligne(id, description, unite, quantite, cout_unitaire, activite_id=None):
+    run_execute(
+        "UPDATE Budget_Lignes SET description=%s, unite=%s, quantite=%s, cout_unitaire=%s, activite_id=%s WHERE id=%s",
+        (description, unite, quantite, cout_unitaire, activite_id, id),
+    )
+    get_budget_lignes_by_projet.clear()
+
+
+def delete_budget_ligne(id):
+    run_execute("DELETE FROM Budget_Lignes WHERE id=%s", (id,))
+    get_budget_lignes_by_projet.clear()
+
+
+UNITES_BUDGET = ["mois", "jour", "homme/jour", "unité", "forfait", "kg", "tonne", "mètre", "litre", "autre"]
 
 
 # ----------------------------------------------------------------------------

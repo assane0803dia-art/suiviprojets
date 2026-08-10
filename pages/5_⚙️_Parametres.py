@@ -143,8 +143,7 @@ with tabs[3]:
         "ℹ️ L'envoi d'email fonctionne pour recevoir vos rapports (page 📊 Rapports) et vos "
         "recommandations IA (page 🤖 IA) à la demande, en un clic. Les alertes automatiques en "
         "arrière-plan (ex: être prévenu dès qu'une tâche prend du retard sans avoir ouvert l'app) "
-        "ne sont pas possibles sur ce type d'hébergement, qui met l'application en veille quand "
-        "personne ne l'utilise."
+        "ne sont pas possibles sur ce type d'hébergement."
     )
 
 # ==============================================================================

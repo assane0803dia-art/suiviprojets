@@ -153,7 +153,18 @@ def inject_global_style():
             }}
 
             [data-testid="stMetricValue"] {{ font-size: 1.05rem; }}
-            [data-testid="stMetricLabel"] {{ font-size: 0.72rem; }}
+            [data-testid="stMetricLabel"] {{
+                font-size: 0.72rem;
+                white-space: normal !important;
+                overflow: visible !important;
+                text-overflow: unset !important;
+                line-height: 1.25;
+            }}
+            [data-testid="stMetricLabel"] > div {{
+                white-space: normal !important;
+                overflow: visible !important;
+                text-overflow: unset !important;
+            }}
             [data-testid="stMetricDelta"] {{ font-size: 0.72rem; }}
         </style>
         """,

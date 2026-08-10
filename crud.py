@@ -39,17 +39,17 @@ def get_utilisateurs(projet_id):
     """Responsables rattachés à un projet précis uniquement — chaque projet a sa
     propre liste, pour garantir l'indépendance entre projets."""
     return run_query(
-        "SELECT id, nom, email, role FROM Utilisateurs WHERE projet_id = %s ORDER BY nom",
+        "SELECT id, nom, email, role, user_id FROM Utilisateurs WHERE projet_id = %s ORDER BY nom",
         params=(projet_id,),
     )
 
 
-def create_utilisateur(nom, email, role, projet_id):
+def create_utilisateur(nom, email, role, projet_id, user_id=None):
     try:
         new_id = run_execute(
-            "INSERT INTO Utilisateurs (nom, email, mot_de_passe, role, projet_id, date_creation) "
-            "VALUES (%s, %s, '', %s, %s, NOW()) RETURNING id",
-            (nom, email, role, projet_id),
+            "INSERT INTO Utilisateurs (nom, email, mot_de_passe, role, projet_id, user_id, date_creation) "
+            "VALUES (%s, %s, '', %s, %s, %s, NOW()) RETURNING id",
+            (nom, email, role, projet_id, user_id),
         )
         get_utilisateurs.clear()
         return new_id
@@ -57,12 +57,18 @@ def create_utilisateur(nom, email, role, projet_id):
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
 
 
-def update_utilisateur(id, nom, email, role):
+def update_utilisateur(id, nom, email, role, user_id=None):
     try:
-        run_execute("UPDATE Utilisateurs SET nom=%s, email=%s, role=%s WHERE id=%s", (nom, email, role, id))
+        run_execute("UPDATE Utilisateurs SET nom=%s, email=%s, role=%s, user_id=%s WHERE id=%s", (nom, email, role, user_id, id))
         get_utilisateurs.clear()
     except psycopg2.errors.UniqueViolation:
         raise ValueError(f"Un responsable avec l'email '{email}' existe déjà.")
+
+
+def get_comptes_utilisateurs():
+    """Liste des comptes de connexion existants (table Users), pour associer un
+    responsable à un compte capable de recevoir des notifications."""
+    return run_query("SELECT id, username, nom_complet FROM Users ORDER BY username")
 
 
 def delete_utilisateur(id):
@@ -460,7 +466,12 @@ def grant_acces_lecteur(user_id, projet_id):
     try:
         run_execute("INSERT INTO Acces_Lecteurs (user_id, projet_id) VALUES (%s, %s)", (user_id, projet_id))
     except psycopg2.errors.UniqueViolation:
-        pass  # Accès déjà accordé
+        return  # Accès déjà accordé, pas de nouvelle notification
+
+    projet = run_query("SELECT nom FROM Projets WHERE id = %s", params=(projet_id,))
+    projet_nom = projet.iloc[0]["nom"] if not projet.empty else "un projet"
+    ajoute_par = st.session_state.get("user", {}).get("username", "un administrateur")
+    notifier_nouvelle_affectation(user_id, projet_id, projet_nom, ajoute_par)
 
 
 def revoke_acces_lecteur(user_id, projet_id):
@@ -861,6 +872,93 @@ def delete_document(id):
 
 
 TYPES_DOCUMENT = ["Rapport", "Contrat", "Fiche projet", "Photo", "Autre"]
+
+
+# ----------------------------------------------------------------------------
+# Centre de notifications
+# ----------------------------------------------------------------------------
+def get_notifications(user_id, only_unread=False):
+    query = "SELECT id, projet_id, activite_id, type, titre, message, date_creation, date_evenement, lu FROM Notifications WHERE user_id = %s"
+    if only_unread:
+        query += " AND lu = FALSE"
+    query += " ORDER BY date_creation DESC"
+    return run_query(query, params=(user_id,))
+
+
+def count_unread_notifications(user_id):
+    df = run_query("SELECT COUNT(*) AS n FROM Notifications WHERE user_id = %s AND lu = FALSE", params=(user_id,))
+    return int(df.iloc[0]["n"]) if not df.empty else 0
+
+
+def mark_notification_read(id):
+    run_execute("UPDATE Notifications SET lu = TRUE WHERE id = %s", (id,))
+
+
+def mark_all_notifications_read(user_id):
+    run_execute("UPDATE Notifications SET lu = TRUE WHERE user_id = %s AND lu = FALSE", (user_id,))
+
+
+def _notification_existe_deja(user_id, type_notif, activite_id=None, projet_id=None):
+    """Anti-doublon : True si une notification identique existe déjà pour cet utilisateur."""
+    df = run_query(
+        "SELECT id FROM Notifications WHERE user_id=%s AND type=%s "
+        "AND activite_id IS NOT DISTINCT FROM %s AND projet_id IS NOT DISTINCT FROM %s",
+        params=(user_id, type_notif, activite_id, projet_id),
+    )
+    return not df.empty
+
+
+def create_notification(user_id, type_notif, titre, message, projet_id=None, activite_id=None, date_evenement=None):
+    if _notification_existe_deja(user_id, type_notif, activite_id, projet_id):
+        return None
+    return run_execute(
+        "INSERT INTO Notifications (user_id, projet_id, activite_id, type, titre, message, date_evenement) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (user_id, projet_id, activite_id, type_notif, titre, message, date_evenement),
+    )
+
+
+def generer_notifications_activites_a_venir(delai_heures=24):
+    """
+    Parcourt toutes les activités dont la date de début approche, et notifie leur
+    responsable — uniquement s'il a un compte de connexion associé (sinon, on ne
+    peut matériellement pas le notifier). Anti-doublon intégré : une activité déjà
+    notifiée pour ce délai n'est pas notifiée une seconde fois.
+    """
+    activites = run_query("""
+        SELECT A.id AS activite_id, A.titre AS activite_titre, A.date_debut,
+               O.projet_id, P.nom AS projet_nom, U.user_id
+        FROM Activites A
+        JOIN Resultats R ON A.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        JOIN Projets P ON O.projet_id = P.id
+        JOIN Utilisateurs U ON A.responsable_id = U.id
+        WHERE A.date_debut IS NOT NULL
+          AND A.statut != 'Terminé'
+          AND U.user_id IS NOT NULL
+          AND A.date_debut BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '%s hours'
+    """ % int(delai_heures))
+
+    for _, act in activites.iterrows():
+        create_notification(
+            user_id=int(act["user_id"]),
+            type_notif="activite_a_venir",
+            titre="🔔 Activité à venir",
+            message=f"L'activité « {act['activite_titre']} » (projet « {act['projet_nom']} ») doit bientôt commencer, le {act['date_debut']}.",
+            projet_id=int(act["projet_id"]),
+            activite_id=int(act["activite_id"]),
+            date_evenement=act["date_debut"],
+        )
+
+
+def notifier_nouvelle_affectation(user_id, projet_id, projet_nom, ajoute_par_nom, role="lecteur"):
+    create_notification(
+        user_id=user_id,
+        type_notif="nouvelle_affectation",
+        titre="📁 Nouveau projet",
+        message=f"Vous avez été ajouté au projet « {projet_nom} » par {ajoute_par_nom} (rôle : {role}).",
+        projet_id=projet_id,
+    )
 
 
 # ----------------------------------------------------------------------------

@@ -124,18 +124,28 @@ st.write("")
 
 if not is_lecteur:
     with st.expander("👥 Gérer les responsables (chefs de projet, gestionnaires, membres d'équipe)"):
+        comptes_df = crud.get_comptes_utilisateurs()
+        compte_options = {None: "— Aucun (ne recevra pas de notifications) —"}
+        for _, c in comptes_df.iterrows():
+            compte_options[c["id"]] = f"{c['username']}" + (f" ({c['nom_complet']})" if c["nom_complet"] else "")
+
         with st.form("form_new_utilisateur", clear_on_submit=True):
             st.markdown("**➕ Ajouter un responsable**")
             c1, c2, c3 = st.columns(3)
             nom_u = c1.text_input("Nom complet *")
             email_u = c2.text_input("Email")
             role_u = c3.text_input("Rôle (ex: Chef de projet)")
+            compte_u = st.selectbox(
+                "Compte associé (facultatif)", options=list(compte_options.keys()),
+                format_func=lambda x: compte_options[x],
+                help="Si ce responsable a aussi un compte de connexion à l'application, associez-le ici pour qu'il puisse recevoir des notifications (ex: activité à venir).",
+            )
             if st.form_submit_button("Ajouter"):
                 if not nom_u:
                     st.warning("Le nom est obligatoire.")
                 else:
                     try:
-                        crud.create_utilisateur(nom_u, email_u, role_u, selected_projet_id)
+                        crud.create_utilisateur(nom_u, email_u, role_u, selected_projet_id, compte_u)
                         st.toast(f"✅ '{nom_u}' ajouté avec succès.")
                         st.rerun()
                     except ValueError as e:
@@ -152,7 +162,8 @@ if not is_lecteur:
             for _, resp in tous_responsables_df.iterrows():
                 rc1, rc2, rc3 = st.columns([3, 2, 1])
                 with rc1:
-                    st.write(f"**{resp['nom']}**")
+                    lien_compte = " 🔔" if resp["user_id"] else ""
+                    st.write(f"**{resp['nom']}**{lien_compte}")
                 with rc2:
                     st.caption(f"{resp['email'] or '—'} — {resp['role'] or '—'}")
                 with rc3:
@@ -166,13 +177,19 @@ if not is_lecteur:
                         ec1, ec2 = st.columns(2)
                         email_edit_u = ec1.text_input("Email", value=resp["email"] or "")
                         role_edit_u = ec2.text_input("Rôle", value=resp["role"] or "")
+                        current_compte = resp["user_id"] if resp["user_id"] in compte_options else None
+                        compte_edit_u = st.selectbox(
+                            "Compte associé (facultatif)", options=list(compte_options.keys()),
+                            format_func=lambda x: compte_options[x],
+                            index=list(compte_options.keys()).index(current_compte),
+                        )
                         col_save_u, col_del_u = st.columns(2)
                         if col_save_u.form_submit_button("💾 Enregistrer", use_container_width=True):
                             if not nom_edit_u:
                                 st.warning("Le nom est obligatoire.")
                             else:
                                 try:
-                                    crud.update_utilisateur(resp["id"], nom_edit_u, email_edit_u, role_edit_u)
+                                    crud.update_utilisateur(resp["id"], nom_edit_u, email_edit_u, role_edit_u, compte_edit_u)
                                     st.toast("✅ Responsable mis à jour avec succès.")
                                     st.session_state["editing_resp_id"] = None
                                     st.rerun()

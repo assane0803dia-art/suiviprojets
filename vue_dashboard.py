@@ -22,6 +22,14 @@ logout_button()
 user = st.session_state.get("user", {})
 is_admin = user.get("role") == "admin"
 
+import datetime as _dt
+if st.session_state.get("notifs_generees_le") != _dt.date.today().isoformat():
+    try:
+        crud.generer_notifications_activites_a_venir()
+        st.session_state["notifs_generees_le"] = _dt.date.today().isoformat()
+    except Exception:
+        pass  # Si la table Notifications n'existe pas encore (migration non exécutée), on ignore silencieusement
+
 
 @st.cache_data(ttl=300)
 def load_vue_dashboard():

@@ -10,13 +10,13 @@ import uuid
 # ----------------------------------------------------------------------------
 # Palette de couleurs (inspirée des outils modernes de gestion de projet)
 # ----------------------------------------------------------------------------
-PRIMARY = "#2563EB"       # Bleu — couleur principale
-PRIMARY_DARK = "#1D4ED8"
-SECONDARY = "#10B981"     # Vert — couleur secondaire
-ACCENT = "#F59E0B"        # Orange — accent
-SUCCESS = "#10B981"
-WARNING = "#F59E0B"
-DANGER = "#EF4444"        # Rouge doux (pas un rouge agressif)
+PRIMARY = "#2563EB"       # Bleu — couleur principale (boutons, liens, accents)
+PRIMARY_DARK = "#1E3A8A"  # Bleu sombre — survol, sidebar, éléments de poids
+SECONDARY = "#38BDF8"     # Bleu ciel — accents secondaires, dégradés, badges neutres
+ACCENT = "#38BDF8"        # Alias de SECONDARY, pour compatibilité
+SUCCESS = "#10B981"       # Vert — conservé pour le sens fonctionnel (statut positif)
+WARNING = "#F59E0B"       # Orange — conservé pour le sens fonctionnel (alerte)
+DANGER = "#EF4444"        # Rouge doux — conservé pour le sens fonctionnel (erreur)
 BG = "#F8FAFC"
 CARD_BG = "#FFFFFF"
 TEXT = "#1F2937"

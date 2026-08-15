@@ -83,8 +83,15 @@ activites_df = crud.get_activites_by_projet(selected_projet_id)
 taches_df = crud.get_taches_by_projet(selected_projet_id)
 depenses_projet_dash = crud.get_depenses_by_projet(selected_projet_id)
 depense_reelle_dash = float(depenses_projet_dash["montant"].sum()) if not depenses_projet_dash.empty else 0.0
+
+lignes_budget_dash = crud.get_budget_lignes_by_projet(selected_projet_id)
+total_hierarchique_dash = float(lignes_budget_dash["cout_total"].sum()) if not lignes_budget_dash.empty else 0.0
 budget_active_dash = float(activites_df["budget"].fillna(0).sum()) if not activites_df.empty else 0.0
-taux_execution_dash = (depense_reelle_dash / budget_active_dash * 100) if budget_active_dash else 0.0
+# Le budget hiérarchique détaillé (Rubriques/Sous-rubriques/Lignes) est la référence la
+# plus précise s'il est renseigné — sinon on retombe sur l'ancien total par activité,
+# exactement la même logique que dans la section Budget de "Mes projets".
+reference_budget_dash = total_hierarchique_dash if total_hierarchique_dash > 0 else budget_active_dash
+taux_execution_dash = (depense_reelle_dash / reference_budget_dash * 100) if reference_budget_dash else 0.0
 
 detail_cols = st.columns(5)
 detail_cols[0].metric("Budget", f"{(projet_row['budget'] or 0):,.0f} FCFA".replace(",", " "))

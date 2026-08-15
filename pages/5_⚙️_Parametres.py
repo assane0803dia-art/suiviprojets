@@ -241,10 +241,33 @@ if is_admin:
             st.info("Aucun projet à partager pour l'instant.")
         else:
             lecteur_options = {row["id"]: row["username"] for _, row in lecteurs_df.iterrows()}
+            projet_options_settings = {row["id"]: row["nom"] for _, row in projets_df_settings.iterrows()}
+
+            with st.expander("➕ Partager avec plusieurs lecteurs à la fois"):
+                st.caption("Ajoute l'accès pour toutes les combinaisons sélectionnées, sans jamais retirer un accès existant.")
+                bulk_lecteurs = st.multiselect(
+                    "Comptes lecteurs", options=list(lecteur_options.keys()),
+                    format_func=lambda x: lecteur_options[x], key="bulk_lecteurs",
+                )
+                bulk_projets = st.multiselect(
+                    "Projets à partager", options=list(projet_options_settings.keys()),
+                    format_func=lambda x: projet_options_settings[x], key="bulk_projets",
+                )
+                if st.button("✅ Accorder l'accès à tous", use_container_width=True):
+                    if not bulk_lecteurs or not bulk_projets:
+                        st.warning("Sélectionnez au moins un compte lecteur et un projet.")
+                    else:
+                        for lecteur_id in bulk_lecteurs:
+                            for projet_id in bulk_projets:
+                                crud.grant_acces_lecteur(lecteur_id, projet_id)
+                        st.toast(f"✅ Accès accordé à {len(bulk_lecteurs)} lecteur(s) sur {len(bulk_projets)} projet(s).")
+                        st.rerun()
+
+            st.write("")
+            st.markdown("**Modifier les accès d'un seul compte (ajout ou retrait précis)**")
             selected_lecteur_id = st.selectbox("Compte lecteur", options=list(lecteur_options.keys()), format_func=lambda x: lecteur_options[x])
 
             projets_deja_accessibles = crud.get_acces_lecteur(selected_lecteur_id)
-            projet_options_settings = {row["id"]: row["nom"] for _, row in projets_df_settings.iterrows()}
 
             selected_projets = st.multiselect(
                 "Projets accessibles à ce compte",

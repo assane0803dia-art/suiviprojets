@@ -15,6 +15,7 @@ type "Private" recommandé puisque l'accès passe déjà par l'authentification 
 
 import requests
 import streamlit as st
+from urllib.parse import quote
 
 BUCKET = "documents"
 
@@ -32,29 +33,33 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {key}", "apikey": key}
 
 
+def _object_url(chemin: str) -> str:
+    """Construit l'URL de l'objet en encodant le chemin (espaces, accents...) —
+    sans quoi Supabase rejette la requête avec 'Invalid path specified'."""
+    chemin_encode = quote(chemin, safe="/")
+    return f"{_base_url()}/storage/v1/object/{BUCKET}/{chemin_encode}"
+
+
 def upload_file(chemin: str, contenu: bytes, content_type: str = "application/octet-stream") -> None:
     """Envoie un fichier dans le bucket. `chemin` est le chemin interne au bucket
     (ex: "12/rapport.pdf"), pas un chemin sur le disque local."""
-    url = f"{_base_url()}/storage/v1/object/{BUCKET}/{chemin}"
     headers = _headers()
     headers["Content-Type"] = content_type
     headers["x-upsert"] = "true"  # écrase si un fichier existe déjà au même chemin
-    resp = requests.post(url, headers=headers, data=contenu, timeout=30)
+    resp = requests.post(_object_url(chemin), headers=headers, data=contenu, timeout=30)
     if resp.status_code not in (200, 201):
         raise RuntimeError(f"Échec de l'envoi du fichier vers Supabase Storage : {resp.text}")
 
 
 def download_file(chemin: str) -> bytes:
-    url = f"{_base_url()}/storage/v1/object/{BUCKET}/{chemin}"
-    resp = requests.get(url, headers=_headers(), timeout=30)
+    resp = requests.get(_object_url(chemin), headers=_headers(), timeout=30)
     if resp.status_code != 200:
         raise RuntimeError(f"Fichier introuvable dans le stockage : {chemin}")
     return resp.content
 
 
 def delete_file(chemin: str) -> None:
-    url = f"{_base_url()}/storage/v1/object/{BUCKET}/{chemin}"
     try:
-        requests.delete(url, headers=_headers(), timeout=30)
+        requests.delete(_object_url(chemin), headers=_headers(), timeout=30)
     except Exception:
         pass  # La suppression du fichier ne doit jamais faire échouer la suppression en base

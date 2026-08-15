@@ -170,6 +170,10 @@ def delete_projet(id):
     run_execute("DELETE FROM Utilisateurs WHERE projet_id=%s", (id,))
     get_utilisateurs.clear()
 
+    # Le "dernier projet consulté" de chaque utilisateur (redirection après connexion)
+    # peut pointer vers ce projet — à détacher avant de le supprimer.
+    run_execute("UPDATE Users SET dernier_projet_id=NULL WHERE dernier_projet_id=%s", (id,))
+
     run_execute("DELETE FROM Projets WHERE id=%s", (id,))
     get_projets.clear()
 

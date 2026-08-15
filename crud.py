@@ -300,6 +300,8 @@ def delete_activite(id):
     run_execute("DELETE FROM Taches WHERE activite_id=%s", (id,))
     run_execute("DELETE FROM Depenses WHERE activite_id=%s", (id,))
     run_execute("UPDATE Budget_Lignes SET activite_id=NULL WHERE activite_id=%s", (id,))
+    # D'autres activités peuvent dépendre de celle-ci (champ "Dépend de", chemin critique)
+    run_execute("UPDATE Activites SET depend_de_activite_id=NULL WHERE depend_de_activite_id=%s", (id,))
     run_execute("DELETE FROM Activites WHERE id=%s", (id,))
     get_activites_by_projet.clear()
     get_taches_by_projet.clear()

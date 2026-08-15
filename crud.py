@@ -153,6 +153,24 @@ def delete_projet(id):
     run_execute("DELETE FROM Documents WHERE projet_id=%s", (id,))
     get_documents.clear()
 
+    # Budget hiérarchique (Rubriques → Sous-rubriques → Lignes)
+    rubriques = run_query("SELECT id FROM Budget_Rubriques WHERE projet_id=%s", params=(id,))
+    for rub_id in rubriques["id"]:
+        delete_budget_rubrique(rub_id)
+
+    # Rapports sauvegardés, accès lecteurs, notifications liées à ce projet
+    run_execute("DELETE FROM Rapports WHERE projet_id=%s", (id,))
+    get_rapports.clear()
+    run_execute("DELETE FROM Acces_Lecteurs WHERE projet_id=%s", (id,))
+    run_execute("DELETE FROM Notifications WHERE projet_id=%s", (id,))
+
+    # Responsables rattachés à ce projet (table Utilisateurs, indépendante par projet)
+    # On détache d'abord le responsable du projet lui-même (référence circulaire :
+    # Projets.responsable_id -> Utilisateurs.id -> Utilisateurs.projet_id -> Projets.id)
+    run_execute("UPDATE Projets SET responsable_id=NULL WHERE id=%s", (id,))
+    run_execute("DELETE FROM Utilisateurs WHERE projet_id=%s", (id,))
+    get_utilisateurs.clear()
+
     run_execute("DELETE FROM Projets WHERE id=%s", (id,))
     get_projets.clear()
 
@@ -278,9 +296,11 @@ def update_activite(id, titre, description, responsable_id, date_debut, date_fin
 def delete_activite(id):
     run_execute("DELETE FROM Taches WHERE activite_id=%s", (id,))
     run_execute("DELETE FROM Depenses WHERE activite_id=%s", (id,))
+    run_execute("UPDATE Budget_Lignes SET activite_id=NULL WHERE activite_id=%s", (id,))
     run_execute("DELETE FROM Activites WHERE id=%s", (id,))
     get_activites_by_projet.clear()
     get_taches_by_projet.clear()
+    get_budget_lignes_by_projet.clear()
 
 
 # ----------------------------------------------------------------------------

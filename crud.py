@@ -160,7 +160,6 @@ def delete_projet(id):
 
     # Rapports sauvegardés, accès lecteurs, notifications liées à ce projet
     run_execute("DELETE FROM Rapports WHERE projet_id=%s", (id,))
-    get_rapports.clear()
     run_execute("DELETE FROM Acces_Lecteurs WHERE projet_id=%s", (id,))
     run_execute("DELETE FROM Notifications WHERE projet_id=%s", (id,))
 

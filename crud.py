@@ -881,11 +881,20 @@ def create_document(projet_id, nom_fichier, chemin_fichier, type_document, descr
 
 
 def _delete_file_safely(chemin_fichier):
-    try:
-        if chemin_fichier and os.path.exists(chemin_fichier):
-            os.remove(chemin_fichier)
-    except OSError:
-        pass  # Le fichier reste orphelin sur le disque, mais on n'interrompt pas la suppression en base
+    """Supprime le fichier associé — dans Supabase Storage si configuré, sinon sur le
+    disque local (ancien comportement, conservé en repli pour les documents créés
+    avant la migration vers un stockage durable)."""
+    if not chemin_fichier:
+        return
+    import storage_service
+    if storage_service.is_configured():
+        storage_service.delete_file(chemin_fichier)
+    else:
+        try:
+            if os.path.exists(chemin_fichier):
+                os.remove(chemin_fichier)
+        except OSError:
+            pass
 
 
 def delete_document(id):

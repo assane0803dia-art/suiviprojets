@@ -7,6 +7,7 @@ import auth
 from ui_style import sidebar_brand, section_title, badge_html, tip, ai_text_field
 import ui_style
 import crud
+import storage_service
 import validators
 import ai_text_assist
 
@@ -465,7 +466,17 @@ if is_lecteur:
                         st.markdown(f"**{doc['nom_fichier']}**")
                         st.caption(f"{doc['type_document'] or 'Autre'} — {doc['description'] or 'Sans description'}")
                     with col2:
-                        if os.path.exists(doc["chemin_fichier"]):
+                        if storage_service.is_configured():
+                            try:
+                                contenu_dl_ro = storage_service.download_file(doc["chemin_fichier"])
+                                st.download_button(
+                                    "⬇️ Télécharger", data=contenu_dl_ro,
+                                    file_name=doc["nom_fichier"], key=f"dl_ro_{doc['id']}",
+                                    use_container_width=True,
+                                )
+                            except RuntimeError:
+                                st.caption("⚠️ Fichier introuvable dans le stockage")
+                        elif os.path.exists(doc["chemin_fichier"]):
                             with open(doc["chemin_fichier"], "rb") as f:
                                 st.download_button(
                                     "⬇️ Télécharger", data=f.read(),
@@ -1469,6 +1480,13 @@ else:
         section_title("📄", "Documents")
         st.caption("Rapports, contrats, fiches projet ou photos liés à ce projet.")
 
+        if not storage_service.is_configured():
+            st.warning(
+                "⚠️ Le stockage durable n'est pas configuré (SUPABASE_URL / SUPABASE_SERVICE_KEY manquants "
+                "dans les secrets) — les fichiers ajoutés maintenant seront perdus au prochain redémarrage "
+                "de l'application. Voir la documentation de `storage_service.py` pour l'activer."
+            )
+
         with st.expander("➕ Ajouter un document"):
             with st.form("form_new_document", clear_on_submit=True):
                 fichier = st.file_uploader("Fichier *", type=None)
@@ -1479,11 +1497,20 @@ else:
                     if fichier is None:
                         st.warning("Veuillez sélectionner un fichier.")
                     else:
-                        dossier = os.path.join("documents", str(selected_projet_id))
-                        os.makedirs(dossier, exist_ok=True)
-                        chemin = os.path.join(dossier, fichier.name)
-                        with open(chemin, "wb") as f:
-                            f.write(fichier.getbuffer())
+                        contenu = fichier.getbuffer().tobytes()
+                        if storage_service.is_configured():
+                            chemin = f"{selected_projet_id}/{fichier.name}"
+                            try:
+                                storage_service.upload_file(chemin, contenu, fichier.type or "application/octet-stream")
+                            except RuntimeError as e:
+                                st.error(str(e))
+                                st.stop()
+                        else:
+                            dossier = os.path.join("documents", str(selected_projet_id))
+                            os.makedirs(dossier, exist_ok=True)
+                            chemin = os.path.join(dossier, fichier.name)
+                            with open(chemin, "wb") as f:
+                                f.write(contenu)
                         crud.create_document(selected_projet_id, fichier.name, chemin, type_doc, description_doc)
                         st.toast("✅ Document ajouté avec succès.")
                         st.rerun()
@@ -1498,7 +1525,17 @@ else:
                         st.markdown(f"**{doc['nom_fichier']}**")
                         st.caption(f"{doc['type_document'] or 'Autre'} — {doc['description'] or 'Sans description'}")
                     with col2:
-                        if os.path.exists(doc["chemin_fichier"]):
+                        if storage_service.is_configured():
+                            try:
+                                contenu_dl = storage_service.download_file(doc["chemin_fichier"])
+                                st.download_button(
+                                    "⬇️ Télécharger", data=contenu_dl,
+                                    file_name=doc["nom_fichier"], key=f"dl_{doc['id']}",
+                                    use_container_width=True,
+                                )
+                            except RuntimeError:
+                                st.caption("⚠️ Fichier introuvable dans le stockage")
+                        elif os.path.exists(doc["chemin_fichier"]):
                             with open(doc["chemin_fichier"], "rb") as f:
                                 st.download_button(
                                     "⬇️ Télécharger", data=f.read(),
@@ -1506,9 +1543,10 @@ else:
                                     use_container_width=True,
                                 )
                         else:
-                            st.caption("⚠️ Fichier introuvable sur le disque")
+                            st.caption("⚠️ Fichier introuvable sur le disque (stockage non durable — voir le message ci-dessus)")
                     with col3:
                         if st.button("🗑️ Supprimer", key=f"del_doc_{doc['id']}", use_container_width=True):
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

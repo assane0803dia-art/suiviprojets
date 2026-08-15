@@ -24,12 +24,12 @@ TYPE_ICONES = {
 }
 
 
-def afficher_notifications(df):
+def afficher_notifications(df, prefix):
     if df.empty:
         st.info("Aucune notification pour l'instant.")
         return
 
-    if st.button("✅ Tout marquer comme lu", key=f"tout_lu_{id(df)}"):
+    if st.button("✅ Tout marquer comme lu", key=f"tout_lu_{prefix}"):
         crud.mark_all_notifications_read(user["id"])
         st.toast("✅ Toutes les notifications ont été marquées comme lues.")
         st.rerun()
@@ -45,20 +45,20 @@ def afficher_notifications(df):
                 st.caption(str(notif["date_creation"]))
             with c2:
                 if notif["projet_id"]:
-                    if st.button("📂 Ouvrir", key=f"open_notif_{notif['id']}", use_container_width=True):
+                    if st.button("📂 Ouvrir", key=f"open_notif_{prefix}_{notif['id']}", use_container_width=True):
                         if not notif["lu"]:
                             crud.mark_notification_read(notif["id"])
                         st.session_state["jump_to_projet_id"] = int(notif["projet_id"])
                         st.session_state["hub_active_section"] = "activites" if notif["activite_id"] else None
                         st.switch_page("pages/2_📂_Mes_Projets.py")
                 if not notif["lu"]:
-                    if st.button("Marquer comme lu", key=f"read_notif_{notif['id']}", use_container_width=True):
+                    if st.button("Marquer comme lu", key=f"read_notif_{prefix}_{notif['id']}", use_container_width=True):
                         crud.mark_notification_read(notif["id"])
                         st.rerun()
 
 
 with onglet_toutes:
-    afficher_notifications(crud.get_notifications(user["id"], only_unread=False))
+    afficher_notifications(crud.get_notifications(user["id"], only_unread=False), prefix="toutes")
 
 with onglet_non_lues:
-    afficher_notifications(crud.get_notifications(user["id"], only_unread=True))
+    afficher_notifications(crud.get_notifications(user["id"], only_unread=True), prefix="nonlues")

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from auth import require_login, logout_button, get_last_project
 from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip
 from i18n import t
@@ -214,23 +215,41 @@ else:
                     st.caption(f"{icone} {ind['nom']} — {txt_pct}")
 
     # ------------------------------------------------------------------------
-    # 3. Graphique global — Baseline -> Actuel -> Cible, un seul graphique
+    # 3. Graphique global — progression normalisée en % de la cible, un seul
+    # graphique, une seule barre par indicateur (comparable même quand les
+    # échelles diffèrent énormément — tonnes/ha, alertes, FCFA/kg...)
     # ------------------------------------------------------------------------
     indicateurs_avec_donnees = [i for i in indicateurs_liste if i["cible"]]
     if indicateurs_avec_donnees:
         st.write("")
-        st.markdown("**📐 Baseline → Situation actuelle → Cible**")
-        df_evolution = pd.DataFrame([
-            {"Indicateur": i["nom"][:40], "Étape": etape, "Valeur": val}
-            for i in indicateurs_avec_donnees
-            for etape, val in [("Baseline", i["baseline"] or 0), ("Actuel", i["actuelle"] or 0), ("Cible", i["cible"])]
-        ])
-        fig_evolution = px.bar(
-            df_evolution, x="Valeur", y="Indicateur", color="Étape", orientation="h", barmode="group",
-            color_discrete_map={"Baseline": "#94A3B8", "Actuel": "#2563EB", "Cible": "#38BDF8"},
-        )
+        st.markdown("**📐 Progression vers la cible**")
+        st.caption("Chaque barre = l'avancement actuel en % de la cible (100% = cible atteinte). Le repère ⚪ indique le point de départ (baseline).")
+
+        noms = [i["nom"][:45] for i in indicateurs_avec_donnees]
+        pct_actuel = [min((i["actuelle"] or 0) / i["cible"] * 100, 130) for i in indicateurs_avec_donnees]
+        pct_baseline = [(i["baseline"] or 0) / i["cible"] * 100 for i in indicateurs_avec_donnees]
+        couleurs = [i["statut"][1] for i in indicateurs_avec_donnees]
+        couleur_map = {"success": "#10B981", "muted": "#2563EB", "warning": "#F59E0B", "danger": "#EF4444"}
+        couleurs_hex = [couleur_map.get(c, "#2563EB") for c in couleurs]
+        textes = [f"{i['actuelle'] or 0:,.0f}/{i['cible']:,.0f} {i['unite']}".replace(",", " ") for i in indicateurs_avec_donnees]
+
+        fig_evolution = go.Figure()
+        fig_evolution.add_trace(go.Bar(
+            x=pct_actuel, y=noms, orientation="h",
+            marker_color=couleurs_hex, text=textes, textposition="outside",
+            name="Avancement actuel",
+        ))
+        fig_evolution.add_trace(go.Scatter(
+            x=pct_baseline, y=noms, mode="markers", marker=dict(symbol="circle", size=10, color="white", line=dict(color="#94A3B8", width=2)),
+            name="Baseline",
+        ))
+        fig_evolution.add_vline(x=100, line_dash="dash", line_color="#94A3B8", annotation_text="Cible (100%)", annotation_position="top")
+
         style_plotly_chart(fig_evolution)
-        fig_evolution.update_layout(margin=dict(l=10, r=10, t=20, b=10), height=max(220, 36 * len(indicateurs_avec_donnees)), yaxis_title="", legend_title="")
+        fig_evolution.update_layout(
+            margin=dict(l=10, r=10, t=30, b=10), height=max(220, 42 * len(indicateurs_avec_donnees)),
+            xaxis_title="% de la cible atteint", yaxis_title="", showlegend=True,
+        )
         st.plotly_chart(fig_evolution, use_container_width=True)
 
     # ------------------------------------------------------------------------

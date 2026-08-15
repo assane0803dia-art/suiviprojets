@@ -115,41 +115,79 @@ df_projet = df_all[df_all["projet"] == projet_row["nom"]]
 NOM_COLONNE_PROGRESSION = "progression_projet"
 
 # ----------------------------------------------------------------------------
-# Indicateurs — affichés ici, configurables directement sur cette page (admin)
+# Indicateurs clés — les VRAIS indicateurs définis dans ce projet (résultats +
+# indicateurs supplémentaires), pas une liste générique identique pour tous les
+# projets. Complétés par la progression moyenne des activités.
 # ----------------------------------------------------------------------------
-indicateurs_config = load_visible_indicators()
-kpis = indicateurs_config[indicateurs_config["type_element"] == "kpi"]
-graphiques = indicateurs_config[indicateurs_config["type_element"] == "graphique"]
+section_title("📊", "Indicateurs clés (KPI)")
 
-if not df_projet.empty and not kpis.empty:
-    kpis_pertinents = kpis[kpis["agregation"] != "count"]  # "nombre de projets" n'a plus de sens par projet
-    if not kpis_pertinents.empty:
-        kpi_cols = st.columns(len(kpis_pertinents))
-        for col, (_, row) in zip(kpi_cols, kpis_pertinents.iterrows()):
-            value = compute_kpi_value(row, df_projet)
-            display_value = format_kpi_value(value, row["format_affichage"])
+resultats_df_kpi = crud.get_resultats_by_projet(selected_projet_id)
+indicateurs_suppl_kpi = crud.get_indicateurs_supplementaires_by_projet(selected_projet_id)
+
+cartes_indicateurs = []
+
+if not activites_df.empty:
+    progression_moyenne = float(activites_df["progression"].fillna(0).mean())
+    cartes_indicateurs.append({
+        "icone": "📈", "libelle": "Progression moyenne",
+        "valeur_actuelle": progression_moyenne, "valeur_cible": 100, "unite": "%",
+    })
+
+if not resultats_df_kpi.empty:
+    for _, r in resultats_df_kpi.iterrows():
+        if r["indicateur"]:
+            cartes_indicateurs.append({
+                "icone": "🎯", "libelle": r["indicateur"],
+                "valeur_actuelle": r["valeur_actuelle"], "valeur_cible": r["valeur_cible"], "unite": r["unite"] or "",
+            })
+
+if not indicateurs_suppl_kpi.empty:
+    for _, i in indicateurs_suppl_kpi.iterrows():
+        cartes_indicateurs.append({
+            "icone": "📌", "libelle": i["nom"],
+            "valeur_actuelle": i["valeur_actuelle"], "valeur_cible": i["valeur_cible"], "unite": i["unite"] or "",
+        })
+
+if not cartes_indicateurs:
+    st.info("Aucun indicateur défini pour ce projet pour l'instant — ajoutez-en depuis la section Résultats de « Mes projets ».")
+else:
+    for i in range(0, len(cartes_indicateurs), 4):
+        ligne = cartes_indicateurs[i:i + 4]
+        cols_kpi = st.columns(4)
+        for col, carte in zip(cols_kpi, ligne):
+            cible = carte["valeur_cible"] or 0
+            actuelle = carte["valeur_actuelle"] or 0
+            progress_pct = (actuelle / cible * 100) if cible else None
+            valeur_affichee = f"{actuelle:,.0f}/{cible:,.0f} {carte['unite']}".replace(",", " ").strip()
             with col:
-                progress_pct = value if row["format_affichage"] == "pourcentage" and value is not None else None
                 st.markdown(
-                    kpi_card_html(row["icone"] or "", row["libelle"], display_value, progress_percent=progress_pct),
+                    kpi_card_html(carte["icone"], carte["libelle"], valeur_affichee, progress_percent=progress_pct),
                     unsafe_allow_html=True,
                 )
 
 st.write("")
 
+# ----------------------------------------------------------------------------
+# Graphiques — configurables directement sur cette page (admin)
+# ----------------------------------------------------------------------------
+indicateurs_config = load_visible_indicators()
+graphiques = indicateurs_config[indicateurs_config["type_element"] == "graphique"]
+
+st.write("")
+
 if is_admin:
-    with st.expander("⚙️ Choisir les indicateurs affichés (visible par toute l'équipe)"):
-        st.caption("Ces réglages s'appliquent à tous les utilisateurs, sur tous les projets.")
+    with st.expander("⚙️ Choisir les graphiques affichés (visible par toute l'équipe)"):
+        st.caption(
+            "Les indicateurs clés (KPI) ne se configurent plus ici — ils sont désormais automatiques, "
+            "dérivés directement des indicateurs définis dans chaque projet (section Résultats)."
+        )
         df_indic_all = load_all_indicators()
+        subset = df_indic_all[df_indic_all["type_element"] == "graphique"]
 
-        for type_element, (icon, label) in [("kpi", ("📊", "Indicateurs clés (KPI)")), ("graphique", ("📈", "Graphiques"))]:
-            subset = df_indic_all[df_indic_all["type_element"] == type_element]
-            st.markdown(f"**{icon} {label}**")
-            if subset.empty:
-                st.caption("Aucun indicateur de ce type.")
-                continue
-
-            with st.form(f"form_dashboard_{type_element}"):
+        if subset.empty:
+            st.caption("Aucun graphique configurable.")
+        else:
+            with st.form("form_dashboard_graphique"):
                 updated_rows = []
                 for _, row in subset.iterrows():
                     cols = st.columns([0.6, 3.4, 1.2, 1.8])
@@ -160,13 +198,12 @@ if is_admin:
                     cols[3].markdown(badge_html("Actif" if row["visible"] else "Masqué", badge_kind), unsafe_allow_html=True)
                     updated_rows.append((row["id"], visible, ordre))
 
-                if st.form_submit_button(f"💾 Enregistrer", use_container_width=True):
+                if st.form_submit_button("💾 Enregistrer", use_container_width=True):
                     for indicateur_id, visible, ordre in updated_rows:
                         update_indicator(indicateur_id, visible, ordre)
                     st.cache_data.clear()
                     st.toast("✅ Configuration enregistrée avec succès.")
                     st.rerun()
-            st.write("")
 
 st.divider()
 

@@ -26,6 +26,8 @@ class ProjectSnapshot:
     activites: list
     taches: list
     indicateurs_supplementaires: list = None
+    depenses: list = None
+    budget_detaille_total: float = 0.0
 
 
 def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapshot:
@@ -35,6 +37,14 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
     activites_df = crud_module.get_activites_by_projet(projet_id)
     taches_df = crud_module.get_taches_by_projet(projet_id)
     indicateurs_suppl_df = crud_module.get_indicateurs_supplementaires_by_projet(projet_id)
+    depenses_df = crud_module.get_depenses_by_projet(projet_id)
+    lignes_budget_df = crud_module.get_budget_lignes_by_projet(projet_id)
+
+    # Le budget détaillé par rubriques (s'il est renseigné) est la référence
+    # officielle du budget prévisionnel — le champ Activites.budget est un
+    # ancien réglage simplifié par activité, pas nécessairement complet
+    # (RH, missions, équipements partagés... n'y sont pas rattachés).
+    budget_detaille_total = float(lignes_budget_df["cout_total"].sum()) if not lignes_budget_df.empty else 0.0
 
     return ProjectSnapshot(
         projet=projet_row.to_dict(),
@@ -43,6 +53,8 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
         activites=activites_df.to_dict("records"),
         taches=taches_df.to_dict("records"),
         indicateurs_supplementaires=indicateurs_suppl_df.to_dict("records"),
+        depenses=depenses_df.to_dict("records"),
+        budget_detaille_total=budget_detaille_total,
     )
 
 
@@ -88,13 +100,17 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
     periode_min = min(dates_debut) if dates_debut else None
     periode_max = max(dates_fin) if dates_fin else None
 
+    depense_reelle_total = sum(d.get("montant") or 0 for d in (snapshot.depenses or []))
+    reference_budget = snapshot.budget_detaille_total if snapshot.budget_detaille_total > 0 else budget_active_total
+    taux_execution = (depense_reelle_total / reference_budget * 100) if reference_budget else 0
+
     lignes = [
         f"Projet : {projet.get('nom')}",
         f"Description (sert de base au Contexte) : {projet.get('description') or 'N/A'}",
         f"Statut actuel : {projet.get('statut')}",
         f"Dates prévues du projet : {projet.get('date_debut') or 'N/A'} au {projet.get('date_fin') or 'N/A'}",
-        f"Budget global déclaré : {projet.get('budget') or 0} FCFA",
-        f"Somme des budgets d'activités : {budget_active_total:.0f} FCFA",
+        f"Budget prévisionnel du projet (détail par rubriques) : {reference_budget:,.0f} {projet.get('devise_principale') or 'FCFA'}".replace(",", " "),
+        f"Dépenses réelles enregistrées à ce jour : {depense_reelle_total:,.0f} {projet.get('devise_principale') or 'FCFA'} (taux d'exécution : {taux_execution:.0f}%)".replace(",", " "),
         f"Période effective d'activités/tâches observée : {periode_min or 'N/A'} au {periode_max or 'N/A'}",
         f"Nombre d'objectifs : {len(snapshot.objectifs)}",
         f"Nombre de résultats attendus : {len(snapshot.resultats)}",

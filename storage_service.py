@@ -28,7 +28,8 @@ def _base_url() -> str:
 
 
 def _headers() -> dict:
-    return {"Authorization": f"Bearer {st.secrets['SUPABASE_SERVICE_KEY']}"}
+    key = st.secrets["SUPABASE_SERVICE_KEY"]
+    return {"Authorization": f"Bearer {key}", "apikey": key}
 
 
 def upload_file(chemin: str, contenu: bytes, content_type: str = "application/octet-stream") -> None:

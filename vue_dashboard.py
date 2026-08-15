@@ -117,53 +117,138 @@ NOM_COLONNE_PROGRESSION = "progression_projet"
 # ----------------------------------------------------------------------------
 # Indicateurs clés — les VRAIS indicateurs définis dans ce projet (résultats +
 # indicateurs supplémentaires), pas une liste générique identique pour tous les
-# projets. Complétés par la progression moyenne des activités.
+# projets. Organisés en 4 niveaux : vue d'ensemble -> par objectif -> graphique
+# global -> détails complets (repliés).
 # ----------------------------------------------------------------------------
-section_title("📊", "Indicateurs clés (KPI)")
+section_title("📊", "Indicateurs clés")
 
 resultats_df_kpi = crud.get_resultats_by_projet(selected_projet_id)
 indicateurs_suppl_kpi = crud.get_indicateurs_supplementaires_by_projet(selected_projet_id)
 
-cartes_indicateurs = []
+progression_moyenne_activites = float(activites_df["progression"].fillna(0).mean()) if not activites_df.empty else None
 
-if not activites_df.empty:
-    progression_moyenne = float(activites_df["progression"].fillna(0).mean())
-    cartes_indicateurs.append({
-        "icone": "📈", "libelle": "Progression moyenne",
-        "valeur_actuelle": progression_moyenne, "valeur_cible": 100, "unite": "%",
-    })
 
+def _statut_indicateur(actuelle, cible):
+    """Classification automatique — jamais définie manuellement, uniquement à
+    partir du niveau de réalisation par rapport à la cible."""
+    if not cible:
+        return ("⚪", "muted", "Non défini", None)
+    pct = (actuelle or 0) / cible * 100
+    if pct >= 100:
+        return ("🟢", "success", "Objectif atteint", pct)
+    elif pct >= 60:
+        return ("🔵", "muted", "Bonne progression", pct)
+    elif pct >= 30:
+        return ("🟠", "warning", "Attention", pct)
+    else:
+        return ("🔴", "danger", "Retard critique", pct)
+
+
+indicateurs_liste = []
 if not resultats_df_kpi.empty:
     for _, r in resultats_df_kpi.iterrows():
         if r["indicateur"]:
-            cartes_indicateurs.append({
-                "icone": "🎯", "libelle": r["indicateur"],
-                "valeur_actuelle": r["valeur_actuelle"], "valeur_cible": r["valeur_cible"], "unite": r["unite"] or "",
+            indicateurs_liste.append({
+                "nom": r["indicateur"], "baseline": r["baseline"], "actuelle": r["valeur_actuelle"],
+                "cible": r["valeur_cible"], "unite": r["unite"] or "", "objectif": r["objectif_titre"],
             })
-
 if not indicateurs_suppl_kpi.empty:
     for _, i in indicateurs_suppl_kpi.iterrows():
-        cartes_indicateurs.append({
-            "icone": "📌", "libelle": i["nom"],
-            "valeur_actuelle": i["valeur_actuelle"], "valeur_cible": i["valeur_cible"], "unite": i["unite"] or "",
+        indicateurs_liste.append({
+            "nom": i["nom"], "baseline": i["baseline"], "actuelle": i["valeur_actuelle"],
+            "cible": i["valeur_cible"], "unite": i["unite"] or "", "objectif": i["objectif_titre"],
         })
 
-if not cartes_indicateurs:
+if not indicateurs_liste and progression_moyenne_activites is None:
     st.info("Aucun indicateur défini pour ce projet pour l'instant — ajoutez-en depuis la section Résultats de « Mes projets ».")
 else:
-    for i in range(0, len(cartes_indicateurs), 4):
-        ligne = cartes_indicateurs[i:i + 4]
-        cols_kpi = st.columns(4)
-        for col, carte in zip(cols_kpi, ligne):
-            cible = carte["valeur_cible"] or 0
-            actuelle = carte["valeur_actuelle"] or 0
-            progress_pct = (actuelle / cible * 100) if cible else None
-            valeur_affichee = f"{actuelle:,.0f}/{cible:,.0f} {carte['unite']}".replace(",", " ").strip()
-            with col:
-                st.markdown(
-                    kpi_card_html(carte["icone"], carte["libelle"], valeur_affichee, progress_percent=progress_pct),
-                    unsafe_allow_html=True,
-                )
+    # ------------------------------------------------------------------------
+    # 1. Vue d'ensemble
+    # ------------------------------------------------------------------------
+    for ind in indicateurs_liste:
+        ind["statut"] = _statut_indicateur(ind["actuelle"], ind["cible"])
+
+    avec_cible = [i for i in indicateurs_liste if i["statut"][3] is not None]
+    nb_atteints = sum(1 for i in avec_cible if i["statut"][0] == "🟢")
+    nb_en_cours = sum(1 for i in avec_cible if i["statut"][0] in ("🔵", "🟠"))
+    nb_en_retard = sum(1 for i in avec_cible if i["statut"][0] == "🔴")
+    taux_global = (sum(i["statut"][3] for i in avec_cible) / len(avec_cible)) if avec_cible else 0
+
+    vue_cols = st.columns(5)
+    vue_cols[0].markdown(kpi_card_html("📈", "Progression moyenne", f"{progression_moyenne_activites:.0f}%" if progression_moyenne_activites is not None else "—", progress_percent=progression_moyenne_activites), unsafe_allow_html=True)
+    vue_cols[1].markdown(kpi_card_html("🔢", "Indicateurs suivis", str(len(indicateurs_liste))), unsafe_allow_html=True)
+    vue_cols[2].markdown(kpi_card_html("🟢", "Atteints", str(nb_atteints)), unsafe_allow_html=True)
+    vue_cols[3].markdown(kpi_card_html("🔵", "En cours", str(nb_en_cours)), unsafe_allow_html=True)
+    vue_cols[4].markdown(kpi_card_html("🔴", "En retard", str(nb_en_retard)), unsafe_allow_html=True)
+
+    if avec_cible:
+        st.write("")
+        st.markdown(f"**Taux global de réalisation des indicateurs : {taux_global:.0f}%**")
+        st.progress(min(int(taux_global), 100))
+
+    # ------------------------------------------------------------------------
+    # 2. Analyse par objectif
+    # ------------------------------------------------------------------------
+    if indicateurs_liste:
+        st.write("")
+        st.markdown("**🎯 Analyse par objectif**")
+        objectifs_groupes = {}
+        for ind in indicateurs_liste:
+            objectifs_groupes.setdefault(ind["objectif"] or "Sans objectif", []).append(ind)
+
+        for objectif_nom, inds in objectifs_groupes.items():
+            inds_avec_cible = [i for i in inds if i["statut"][3] is not None]
+            pct_objectif = (sum(i["statut"][3] for i in inds_avec_cible) / len(inds_avec_cible)) if inds_avec_cible else None
+            icone_obj, kind_obj, label_obj, _ = _statut_indicateur(pct_objectif, 100) if pct_objectif is not None else ("⚪", "muted", "Non mesuré", None)
+
+            with st.container(border=True):
+                c1, c2 = st.columns([4, 1])
+                with c1:
+                    st.markdown(f"**{objectif_nom}**")
+                with c2:
+                    if pct_objectif is not None:
+                        st.markdown(badge_html(f"{icone_obj} {pct_objectif:.0f}%", kind_obj), unsafe_allow_html=True)
+                for ind in inds:
+                    icone, kind, label, pct = ind["statut"]
+                    txt_pct = f"{pct:.0f}%" if pct is not None else "—"
+                    st.caption(f"{icone} {ind['nom']} — {txt_pct}")
+
+    # ------------------------------------------------------------------------
+    # 3. Graphique global — Baseline -> Actuel -> Cible, un seul graphique
+    # ------------------------------------------------------------------------
+    indicateurs_avec_donnees = [i for i in indicateurs_liste if i["cible"]]
+    if indicateurs_avec_donnees:
+        st.write("")
+        st.markdown("**📐 Baseline → Situation actuelle → Cible**")
+        df_evolution = pd.DataFrame([
+            {"Indicateur": i["nom"][:40], "Étape": etape, "Valeur": val}
+            for i in indicateurs_avec_donnees
+            for etape, val in [("Baseline", i["baseline"] or 0), ("Actuel", i["actuelle"] or 0), ("Cible", i["cible"])]
+        ])
+        fig_evolution = px.bar(
+            df_evolution, x="Valeur", y="Indicateur", color="Étape", orientation="h", barmode="group",
+            color_discrete_map={"Baseline": "#94A3B8", "Actuel": "#2563EB", "Cible": "#38BDF8"},
+        )
+        style_plotly_chart(fig_evolution)
+        fig_evolution.update_layout(margin=dict(l=10, r=10, t=20, b=10), height=max(220, 36 * len(indicateurs_avec_donnees)), yaxis_title="", legend_title="")
+        st.plotly_chart(fig_evolution, use_container_width=True)
+
+    # ------------------------------------------------------------------------
+    # 4. Détails complets — repliés
+    # ------------------------------------------------------------------------
+    if indicateurs_liste:
+        with st.expander("🔍 Voir le détail de tous les indicateurs"):
+            for i in range(0, len(indicateurs_liste), 4):
+                ligne = indicateurs_liste[i:i + 4]
+                cols_kpi = st.columns(4)
+                for col, ind in zip(cols_kpi, ligne):
+                    icone, kind, label, pct = ind["statut"]
+                    valeur_affichee = f"{(ind['actuelle'] or 0):,.0f}/{(ind['cible'] or 0):,.0f} {ind['unite']}".replace(",", " ").strip()
+                    with col:
+                        st.markdown(kpi_card_html(icone, ind["nom"], valeur_affichee, progress_percent=pct), unsafe_allow_html=True)
+                        if ind["baseline"] is not None:
+                            st.caption(f"Baseline : {ind['baseline']}")
+                        st.markdown(badge_html(label, kind), unsafe_allow_html=True)
 
 st.write("")
 

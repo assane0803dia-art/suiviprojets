@@ -97,6 +97,7 @@ def inject_global_style():
             }}
             .badge-success {{ background-color: #DCFCE7; color: {SUCCESS}; }}
             .badge-warning {{ background-color: #FEF3C7; color: {WARNING}; }}
+            .badge-danger {{ background-color: #FEE2E2; color: {DANGER}; }}
             .badge-muted {{ background-color: #F1F5F9; color: {MUTED}; }}
 
             div.stButton > button, div.stFormSubmitButton > button {{

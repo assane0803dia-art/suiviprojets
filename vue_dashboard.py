@@ -396,7 +396,14 @@ st.divider()
 # Performance des responsables
 # ----------------------------------------------------------------------------
 section_title("🏆", "Performance des responsables")
-tip("performance_responsables", "La performance d'un responsable est la moyenne de la progression de toutes ses activités assignées dans ce projet. Les responsables sans activité ne sont pas affichés.")
+tip(
+    "performance_responsables",
+    "La performance d'un responsable est la moyenne de la progression de toutes ses activités "
+    "assignées dans ce projet. Les responsables sans activité ne sont pas affichés. ⚠️ Un score bas "
+    "ne signifie pas forcément une sous-performance : il peut simplement refléter des activités dont "
+    "la période n'a pas encore commencé (donc à 0% par nature, pas par retard). Comparez toujours ce "
+    "score aux dates prévues des activités avant d'en tirer une conclusion."
+)
 
 perf_df = crud.get_performance_responsables(selected_projet_id)
 
@@ -409,14 +416,15 @@ else:
     fig_perf = px.bar(
         perf_df, x="performance_moyenne", y="responsable", orientation="h",
         text_auto=".0f", color_discrete_sequence=["#2563EB"],
-        custom_data=["nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard"],
+        custom_data=["nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard", "nb_a_venir"],
     )
     fig_perf.update_traces(
         hovertemplate=(
             "<b>%{y}</b><br>"
             "Performance moyenne : %{x:.0f}%<br>"
             "Activités assignées : %{customdata[0]}<br>"
-            "Terminées : %{customdata[1]} · En cours : %{customdata[2]} · En retard : %{customdata[3]}"
+            "Terminées : %{customdata[1]} · En cours : %{customdata[2]}<br>"
+            "En retard : %{customdata[3]} · Pas encore commencées : %{customdata[4]}"
             "<extra></extra>"
         )
     )

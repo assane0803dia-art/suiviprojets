@@ -433,7 +433,8 @@ def get_performance_responsables(projet_id):
                AVG(A.progression) AS performance_moyenne,
                SUM(CASE WHEN A.statut = 'Terminé' THEN 1 ELSE 0 END) AS nb_terminees,
                SUM(CASE WHEN A.statut = 'En cours' THEN 1 ELSE 0 END) AS nb_en_cours,
-               SUM(CASE WHEN A.date_fin < CURRENT_DATE AND A.statut != 'Terminé' THEN 1 ELSE 0 END) AS nb_en_retard
+               SUM(CASE WHEN A.date_fin < CURRENT_DATE AND A.statut != 'Terminé' THEN 1 ELSE 0 END) AS nb_en_retard,
+               SUM(CASE WHEN A.date_debut > CURRENT_DATE THEN 1 ELSE 0 END) AS nb_a_venir
         FROM Utilisateurs U
         JOIN Activites A ON A.responsable_id = U.id
         JOIN Resultats R ON A.resultat_id = R.id

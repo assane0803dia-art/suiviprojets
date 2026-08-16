@@ -418,6 +418,7 @@ else:
         text_auto=".0f", color_discrete_sequence=["#2563EB"],
         custom_data=["nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard", "nb_a_venir"],
     )
+    fig_perf.update_traces(textposition="outside")  # sans ça, une barre à 0% n'affiche aucune étiquette
     fig_perf.update_traces(
         hovertemplate=(
             "<b>%{y}</b><br>"
@@ -431,7 +432,7 @@ else:
     style_plotly_chart(fig_perf)
     fig_perf.update_layout(
         xaxis_title="Performance moyenne (%)", yaxis_title="",
-        xaxis_range=[0, 100],
+        xaxis_range=[0, 112],
         margin=dict(l=10, r=10, t=20, b=10), height=max(200, 45 * len(perf_df)),
         showlegend=False,
     )

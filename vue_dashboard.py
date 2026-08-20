@@ -176,12 +176,10 @@ else:
     nb_en_retard = sum(1 for i in avec_cible if i["statut"][0] == "🔴")
     taux_global = (sum(i["statut"][3] for i in avec_cible) / len(avec_cible)) if avec_cible else 0
 
-    vue_cols = st.columns(5)
+    vue_cols = st.columns(3)
     vue_cols[0].markdown(kpi_card_html("📈", "Progression moyenne", f"{progression_moyenne_activites:.0f}%" if progression_moyenne_activites is not None else "—", progress_percent=progression_moyenne_activites), unsafe_allow_html=True)
     vue_cols[1].markdown(kpi_card_html("🔢", "Indicateurs suivis", str(len(indicateurs_liste))), unsafe_allow_html=True)
     vue_cols[2].markdown(kpi_card_html("🟢", "Atteints", str(nb_atteints)), unsafe_allow_html=True)
-    vue_cols[3].markdown(kpi_card_html("🔵", "En cours", str(nb_en_cours)), unsafe_allow_html=True)
-    vue_cols[4].markdown(kpi_card_html("🔴", "En retard", str(nb_en_retard)), unsafe_allow_html=True)
 
     if avec_cible:
         st.write("")

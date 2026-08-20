@@ -28,6 +28,7 @@ class ProjectSnapshot:
     indicateurs_supplementaires: list = None
     depenses: list = None
     budget_detaille_total: float = 0.0
+    indicateurs_calendrier: list = None
 
 
 def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapshot:
@@ -39,12 +40,29 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
     indicateurs_suppl_df = crud_module.get_indicateurs_supplementaires_by_projet(projet_id)
     depenses_df = crud_module.get_depenses_by_projet(projet_id)
     lignes_budget_df = crud_module.get_budget_lignes_by_projet(projet_id)
+    toutes_periodes_df = crud_module.get_toutes_periodes_projet(projet_id)
 
     # Le budget détaillé par rubriques (s'il est renseigné) est la référence
     # officielle du budget prévisionnel — le champ Activites.budget est un
     # ancien réglage simplifié par activité, pas nécessairement complet
     # (RH, missions, équipements partagés... n'y sont pas rattachés).
     budget_detaille_total = float(lignes_budget_df["cout_total"].sum()) if not lignes_budget_df.empty else 0.0
+
+    # Statut calendaire de chaque indicateur ventilé (même logique que le Dashboard) :
+    # comparaison cumulée cible vs réalisé, pas le taux final brut.
+    indicateurs_calendrier = []
+    if not toutes_periodes_df.empty:
+        import indicateurs_temporels
+        for _, groupe in toutes_periodes_df.groupby("indicateur_key"):
+            periodes_ind = groupe.rename(columns={"periode_label": "label"}).to_dict("records")
+            periodes_calc = indicateurs_temporels.calculer_statuts_cumules(sorted(periodes_ind, key=lambda p: p["date_debut"]))
+            periodes_commencees = [p for p in periodes_calc if p["statut"] != "À venir"]
+            statut_actuel = periodes_commencees[-1] if periodes_commencees else periodes_calc[-1]
+            indicateurs_calendrier.append({
+                "nom": groupe.iloc[0]["nom_indicateur"], "statut": statut_actuel["statut"],
+                "cible_cumulee": statut_actuel["cible_cumulee"], "realise_cumule": statut_actuel["realise_cumule"],
+                "ecart": statut_actuel["ecart"], "derniere_periode": statut_actuel["label"],
+            })
 
     return ProjectSnapshot(
         projet=projet_row.to_dict(),
@@ -55,6 +73,7 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
         indicateurs_supplementaires=indicateurs_suppl_df.to_dict("records"),
         depenses=depenses_df.to_dict("records"),
         budget_detaille_total=budget_detaille_total,
+        indicateurs_calendrier=indicateurs_calendrier,
     )
 
 
@@ -164,6 +183,22 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
             lignes.append(f"- {t.get('titre')} (échéance : {t.get('date_fin')}, statut : {t.get('statut')})")
     else:
         lignes.append("- Aucune")
+
+    if snapshot.indicateurs_calendrier:
+        lignes.append("")
+        lignes.append("INDICATEURS AVEC VENTILATION TEMPORELLE (comparaison CUMULÉE cible vs réalisé à ce jour, pas le taux final) :")
+        for ind in snapshot.indicateurs_calendrier:
+            lignes.append(
+                f"- {ind['nom']} — statut : {ind['statut']} (à la période {ind['derniere_periode']}) — "
+                f"cible cumulée : {ind['cible_cumulee']:.1f}, réalisé cumulé : {ind['realise_cumule']:.1f}, écart : {ind['ecart']:+.1f}"
+            )
+        lignes.append(
+            "Consigne pour ces indicateurs : base ton analyse de retard sur ce statut cumulé (Conforme/En avance/"
+            "En retard/Critique), PAS sur le taux d'atteinte de la cible finale du projet — un indicateur peut "
+            "sembler bas en valeur absolue tout en étant parfaitement conforme à son calendrier. Si un écart "
+            "existe, tu peux le relier à une observation d'activité pertinente si elle est disponible ci-dessus, "
+            "sans jamais inventer de lien qui ne serait pas clairement établi par les données."
+        )
 
     donnees = "\n".join(lignes)
 

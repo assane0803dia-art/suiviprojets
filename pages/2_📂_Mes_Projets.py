@@ -604,17 +604,27 @@ else:
                                 key=f"freq_res_{res['id']}",
                                 help="Planifie une cible par période, pour détecter un retard avant la fin du projet plutôt qu'à la toute fin.",
                             )
+                            vc1, vc2 = st.columns(2)
+                            date_debut_vent = vc1.date_input(
+                                "Début de la ventilation", value=projet_row["date_debut"], key=f"vent_debut_res_{res['id']}",
+                                help="Par défaut la date de début du projet — à ajuster si cet indicateur ne démarre réellement que plus tard.",
+                            )
+                            date_fin_vent = vc2.date_input(
+                                "Fin de la ventilation", value=projet_row["date_fin"], key=f"vent_fin_res_{res['id']}",
+                            )
                             if st.button("🔄 Générer / régénérer les périodes", key=f"gen_periodes_res_{res['id']}"):
                                 if nouvelle_freq != freq_actuelle:
                                     crud.set_frequence_ventilation_resultat(res["id"], nouvelle_freq)
                                 if nouvelle_freq == "aucune":
                                     crud.regenerer_periodes_resultat(res["id"], [])
+                                elif not validators.dates_valides(date_debut_vent, date_fin_vent):
+                                    st.warning("⚠️ La date de fin de ventilation ne peut pas être antérieure à la date de début.")
                                 else:
                                     nouvelles_periodes = indicateurs_temporels.generer_periodes(
-                                        projet_row["date_debut"], projet_row["date_fin"], nouvelle_freq, cible_finale=res["valeur_cible"] or 0,
+                                        date_debut_vent, date_fin_vent, nouvelle_freq, cible_finale=res["valeur_cible"] or 0,
                                     )
                                     if not nouvelles_periodes:
-                                        st.warning("Impossible de générer des périodes — vérifiez que le projet a bien une date de début et une date de fin.")
+                                        st.warning("Impossible de générer des périodes — vérifiez les dates de ventilation.")
                                     else:
                                         crud.regenerer_periodes_resultat(res["id"], nouvelles_periodes)
                                         st.toast(f"✅ {len(nouvelles_periodes)} période(s) générée(s).")
@@ -688,17 +698,27 @@ else:
                                         key=f"freq_ind_{ind['id']}",
                                         help="Planifie une cible par période, pour détecter un retard avant la fin du projet plutôt qu'à la toute fin.",
                                     )
+                                    vc1_ind, vc2_ind = st.columns(2)
+                                    date_debut_vent_ind = vc1_ind.date_input(
+                                        "Début de la ventilation", value=projet_row["date_debut"], key=f"vent_debut_ind_{ind['id']}",
+                                        help="Par défaut la date de début du projet — à ajuster si cet indicateur ne démarre réellement que plus tard.",
+                                    )
+                                    date_fin_vent_ind = vc2_ind.date_input(
+                                        "Fin de la ventilation", value=projet_row["date_fin"], key=f"vent_fin_ind_{ind['id']}",
+                                    )
                                     if st.button("🔄 Générer / régénérer les périodes", key=f"gen_periodes_ind_{ind['id']}"):
                                         if nouvelle_freq_ind != freq_actuelle_ind:
                                             crud.set_frequence_ventilation_indicateur_suppl(ind["id"], nouvelle_freq_ind)
                                         if nouvelle_freq_ind == "aucune":
                                             crud.regenerer_periodes_indicateur_suppl(ind["id"], [])
+                                        elif not validators.dates_valides(date_debut_vent_ind, date_fin_vent_ind):
+                                            st.warning("⚠️ La date de fin de ventilation ne peut pas être antérieure à la date de début.")
                                         else:
                                             nouvelles_periodes_ind = indicateurs_temporels.generer_periodes(
-                                                projet_row["date_debut"], projet_row["date_fin"], nouvelle_freq_ind, cible_finale=ind["valeur_cible"] or 0,
+                                                date_debut_vent_ind, date_fin_vent_ind, nouvelle_freq_ind, cible_finale=ind["valeur_cible"] or 0,
                                             )
                                             if not nouvelles_periodes_ind:
-                                                st.warning("Impossible de générer des périodes — vérifiez que le projet a bien une date de début et une date de fin.")
+                                                st.warning("Impossible de générer des périodes — vérifiez les dates de ventilation.")
                                             else:
                                                 crud.regenerer_periodes_indicateur_suppl(ind["id"], nouvelles_periodes_ind)
                                                 st.toast(f"✅ {len(nouvelles_periodes_ind)} période(s) générée(s).")
@@ -1581,4 +1601,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

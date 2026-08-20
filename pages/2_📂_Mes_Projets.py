@@ -697,7 +697,7 @@ else:
                             if not periodes_res.empty:
                                 periodes_liste = periodes_res.to_dict("records")
                                 for p in periodes_liste:
-                                    p["date_debut"] = p["date_debut"]
+                                    p["label"] = p.pop("periode_label")
                                 periodes_calc = indicateurs_temporels.calculer_statuts_cumules(
                                     sorted(periodes_liste, key=lambda p: p["date_debut"])
                                 )
@@ -1609,4 +1609,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

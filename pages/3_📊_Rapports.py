@@ -59,7 +59,49 @@ st.divider()
 section_title("🤖", "Rapport d'exécution")
 tip("rapport_ia", "Vérifiez le rapport avant export — le contenu ci-dessous est entièrement modifiable. Sections couvertes : résumé, contexte, problématique, objectifs, résultats, activités, indicateurs, risques, budget, calendrier, conclusion et recommandations.")
 
-modele_prefere = (profile or {}).get("ia_modele") or "claude-sonnet-5"
+with st.expander("⚙️ Paramètres du rapport", expanded=True):
+    pc1, pc2 = st.columns(2)
+    modele_rapport_choisi = pc1.selectbox(
+        "Type de rapport", ["Standard", "Résumé court", "Détaillé"],
+        index=["Standard", "Résumé court", "Détaillé"].index(profile["modele_rapport"]) if profile and profile["modele_rapport"] in ["Standard", "Résumé court", "Détaillé"] else 0,
+    )
+    modele_ia_choisi = pc2.selectbox(
+        "Modèle IA", ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
+        index=["claude-sonnet-5", "claude-haiku-4-5-20251001"].index(profile["ia_modele"]) if profile and profile["ia_modele"] in ["claude-sonnet-5", "claude-haiku-4-5-20251001"] else 0,
+        format_func=lambda x: "Claude Sonnet 5 (qualité, recommandé)" if x == "claude-sonnet-5" else "Claude Haiku 4.5 (rapide, économique)",
+    )
+    if (modele_rapport_choisi != (profile or {}).get("modele_rapport")) or (modele_ia_choisi != (profile or {}).get("ia_modele")):
+        crud.update_modele_rapport_seul(user["id"], modele_rapport_choisi)
+        crud.update_ia_modele_seul(user["id"], modele_ia_choisi)
+
+    st.write("")
+    type_periode = st.radio(
+        "Période couverte par le rapport", ["Toute la durée du projet", "Mois en cours", "Trimestre en cours", "Semestre en cours", "Année en cours", "Personnalisée"],
+        horizontal=True,
+    )
+    periode_debut_rapport, periode_fin_rapport = None, None
+    aujourdhui = datetime.now().date()
+    if type_periode == "Mois en cours":
+        periode_debut_rapport = aujourdhui.replace(day=1)
+        periode_fin_rapport = aujourdhui
+    elif type_periode == "Trimestre en cours":
+        mois_debut_trim = ((aujourdhui.month - 1) // 3) * 3 + 1
+        periode_debut_rapport = aujourdhui.replace(month=mois_debut_trim, day=1)
+        periode_fin_rapport = aujourdhui
+    elif type_periode == "Semestre en cours":
+        mois_debut_sem = 1 if aujourdhui.month <= 6 else 7
+        periode_debut_rapport = aujourdhui.replace(month=mois_debut_sem, day=1)
+        periode_fin_rapport = aujourdhui
+    elif type_periode == "Année en cours":
+        periode_debut_rapport = aujourdhui.replace(month=1, day=1)
+        periode_fin_rapport = aujourdhui
+    elif type_periode == "Personnalisée":
+        pdc1, pdc2 = st.columns(2)
+        periode_debut_rapport = pdc1.date_input("Date de début", value=projet_row["date_debut"] or aujourdhui)
+        periode_fin_rapport = pdc2.date_input("Date de fin", value=aujourdhui)
+
+    if periode_debut_rapport and periode_fin_rapport:
+        st.caption(f"📅 Période retenue : **{periode_debut_rapport.strftime('%d/%m/%Y')} → {periode_fin_rapport.strftime('%d/%m/%Y')}**")
 
 col_gen, col_regen = st.columns(2)
 with col_gen:
@@ -73,8 +115,14 @@ if generer or regenerer:
     else:
         with st.spinner("Analyse du projet et rédaction du rapport en cours..."):
             try:
-                snapshot = ai.build_project_snapshot(selected_projet_id, projet_row, crud)
-                report_text = ai.generate_execution_report(snapshot, model=modele_prefere)
+                snapshot = ai.build_project_snapshot(
+                    selected_projet_id, projet_row, crud,
+                    periode_debut=periode_debut_rapport, periode_fin=periode_fin_rapport,
+                )
+                report_text = ai.generate_execution_report(
+                    snapshot, model=modele_ia_choisi, modele_rapport=modele_rapport_choisi,
+                    periode_debut=periode_debut_rapport, periode_fin=periode_fin_rapport,
+                )
                 st.session_state["rapport_draft"] = report_text
                 st.toast("✅ Rapport généré avec succès. Vous pouvez le modifier ci-dessous avant de l'enregistrer.")
             except RuntimeError as e:
@@ -135,6 +183,8 @@ if "rapport_draft" in st.session_state:
                         st.error(message)
             else:
                 st.caption("💡 Ajoutez votre email dans Paramètres → Compte pour recevoir vos rapports.")
+        elif user.get("role") == "admin":
+            st.caption("🔧 (Admin) Email non configuré — ajoutez SMTP_HOST/PORT/USER/PASSWORD dans les secrets.")
 
 st.divider()
 

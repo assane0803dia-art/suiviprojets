@@ -61,6 +61,18 @@ def update_preferences_projet(user_id, langue, fuseau_horaire, modele_rapport):
     )
 
 
+def update_modele_rapport_seul(user_id, modele_rapport):
+    """Modifie uniquement le modèle de rapport, sans toucher aux autres préférences —
+    utilisé depuis la page Rapports, où ce réglage a été rapatrié."""
+    db.run_execute("UPDATE Users SET modele_rapport = %s WHERE id = %s", (modele_rapport, user_id))
+
+
+def update_ia_modele_seul(user_id, ia_modele):
+    """Modifie uniquement le modèle IA utilisé pour les rapports, sans toucher aux
+    autres réglages IA (créativité, langue, suggestions) — utilisé depuis Rapports."""
+    db.run_execute("UPDATE Users SET ia_modele = %s WHERE id = %s", (ia_modele, user_id))
+
+
 def update_preferences_ia(user_id, ia_modele, ia_creativite, ia_langue_reponses, ia_suggestions_auto):
     db.run_execute(
         """UPDATE Users SET ia_modele = %s, ia_creativite = %s, ia_langue_reponses = %s,

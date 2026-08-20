@@ -83,16 +83,13 @@ with tabs[1]:
             ["Africa/Dakar", "Europe/Paris", "UTC"],
             index=["Africa/Dakar", "Europe/Paris", "UTC"].index(profile["fuseau_horaire"]) if profile["fuseau_horaire"] in ["Africa/Dakar", "Europe/Paris", "UTC"] else 0,
         )
-        modele_rapport = st.selectbox(
-            "Modèle de rapport par défaut",
-            ["Standard", "Résumé court", "Détaillé"],
-            index=["Standard", "Résumé court", "Détaillé"].index(profile["modele_rapport"]) if profile["modele_rapport"] in ["Standard", "Résumé court", "Détaillé"] else 0,
-        )
         if st.form_submit_button("💾 Enregistrer", use_container_width=True):
-            update_preferences_projet(user["id"], langue, fuseau, modele_rapport)
+            update_preferences_projet(user["id"], langue, fuseau, profile["modele_rapport"])
             st.session_state["langue_utilisateur"] = langue
             st.toast("✅ Préférences mises à jour avec succès.")
             st.rerun()
+
+    st.caption("ℹ️ Le modèle de rapport et le modèle IA se règlent désormais directement sur la page 📊 Rapports.")
 
     st.caption(
         "ℹ️ Traduction anglaise en cours : la navigation et les titres de pages s'adaptent déjà "
@@ -106,12 +103,6 @@ with tabs[2]:
     tip("ia", "Un niveau de créativité plus élevé donne des rapports plus riches en formulation, mais moins littéraux.")
 
     with st.form("form_ia"):
-        ia_modele = st.selectbox(
-            "Modèle utilisé pour la génération de rapports",
-            ["claude-sonnet-5", "claude-haiku-4-5-20251001"],
-            index=["claude-sonnet-5", "claude-haiku-4-5-20251001"].index(profile["ia_modele"]) if profile["ia_modele"] in ["claude-sonnet-5", "claude-haiku-4-5-20251001"] else 0,
-            format_func=lambda x: "Claude Sonnet 5 (qualité, recommandé)" if x == "claude-sonnet-5" else "Claude Haiku 4.5 (rapide, économique)",
-        )
         ia_creativite = st.slider("Niveau de créativité", 0, 100, int(profile["ia_creativite"] or 50))
         ia_langue = st.selectbox(
             "Langue des réponses de l'IA", ["fr", "en"],
@@ -121,9 +112,11 @@ with tabs[2]:
         ia_suggestions = st.toggle("Activer les suggestions automatiques", value=bool(profile["ia_suggestions_auto"]))
 
         if st.form_submit_button("💾 Enregistrer", use_container_width=True):
-            update_preferences_ia(user["id"], ia_modele, ia_creativite, ia_langue, ia_suggestions)
+            update_preferences_ia(user["id"], profile["ia_modele"], ia_creativite, ia_langue, ia_suggestions)
             st.toast("✅ Préférences IA mises à jour avec succès.")
             st.rerun()
+
+    st.caption("ℹ️ Le modèle IA utilisé pour la génération de rapports se règle désormais directement sur la page 📊 Rapports.")
 
 # ==============================================================================
 # NOTIFICATIONS

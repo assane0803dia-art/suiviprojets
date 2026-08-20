@@ -31,8 +31,16 @@ class ProjectSnapshot:
     indicateurs_calendrier: list = None
 
 
-def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapshot:
-    """Rassemble toute la hiérarchie d'un projet dans une structure unique."""
+def build_project_snapshot(projet_id, projet_row, crud_module, periode_debut=None, periode_fin=None) -> ProjectSnapshot:
+    """
+    Rassemble toute la hiérarchie d'un projet dans une structure unique.
+
+    Si `periode_debut`/`periode_fin` sont fournis, le rapport ne porte que sur
+    cette période : activités et tâches chevauchant la période, dépenses dont la
+    date tombe dedans. Les indicateurs restent calculés en CUMULÉ depuis le début
+    du projet jusqu'à la fin de la période choisie (cohérent avec la logique de
+    détection de retard déjà en place — un cumul tronqué n'aurait pas de sens).
+    """
     objectifs_df = crud_module.get_objectifs(projet_id)
     resultats_df = crud_module.get_resultats_by_projet(projet_id)
     activites_df = crud_module.get_activites_by_projet(projet_id)
@@ -41,6 +49,29 @@ def build_project_snapshot(projet_id, projet_row, crud_module) -> ProjectSnapsho
     depenses_df = crud_module.get_depenses_by_projet(projet_id)
     lignes_budget_df = crud_module.get_budget_lignes_by_projet(projet_id)
     toutes_periodes_df = crud_module.get_toutes_periodes_projet(projet_id)
+
+    if periode_debut and periode_fin:
+        if not activites_df.empty:
+            chevauche = (
+                (activites_df["date_debut"].isna() | (activites_df["date_debut"] <= periode_fin))
+                & (activites_df["date_fin"].isna() | (activites_df["date_fin"] >= periode_debut))
+            )
+            activites_df = activites_df[chevauche]
+        if not taches_df.empty:
+            chevauche_t = (
+                (taches_df["date_debut"].isna() | (taches_df["date_debut"] <= periode_fin))
+                & (taches_df["date_fin"].isna() | (taches_df["date_fin"] >= periode_debut))
+            )
+            taches_df = taches_df[chevauche_t]
+        if not depenses_df.empty:
+            depenses_df = depenses_df[
+                (depenses_df["date_depense"] >= periode_debut) & (depenses_df["date_depense"] <= periode_fin)
+            ]
+        if not toutes_periodes_df.empty:
+            # On garde tout l'historique cumulé jusqu'à la fin de la période choisie
+            # (pas seulement les périodes strictement à l'intérieur), pour que le
+            # cumulé cible/réalisé reste correct.
+            toutes_periodes_df = toutes_periodes_df[toutes_periodes_df["date_debut"] <= periode_fin]
 
     # Le budget détaillé par rubriques (s'il est renseigné) est la référence
     # officielle du budget prévisionnel — le champ Activites.budget est un
@@ -102,7 +133,7 @@ def detect_delays_and_risks(snapshot: ProjectSnapshot) -> dict:
     }
 
 
-def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
+def _build_prompt(snapshot: ProjectSnapshot, risques: dict, modele_rapport: str = "Standard", periode_debut=None, periode_fin=None) -> str:
     projet = snapshot.projet
     nb_taches = len(snapshot.taches)
     nb_taches_terminees = sum(1 for t in snapshot.taches if t.get("statut") == "Terminé")
@@ -123,11 +154,26 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
     reference_budget = snapshot.budget_detaille_total if snapshot.budget_detaille_total > 0 else budget_active_total
     taux_execution = (depense_reelle_total / reference_budget * 100) if reference_budget else 0
 
+    niveau_detail = {
+        "Résumé court": "Reste très concis : un résumé exécutif de quelques phrases par section, pas de développement long.",
+        "Détaillé": "Développe chaque section en profondeur, avec une analyse fine de chaque écart et de ses implications.",
+        "Standard": "Niveau de détail standard : équilibré, ni trop bref ni trop long.",
+    }.get(modele_rapport, "Niveau de détail standard : équilibré, ni trop bref ni trop long.")
+
     lignes = [
         f"Projet : {projet.get('nom')}",
         f"Description (sert de base au Contexte) : {projet.get('description') or 'N/A'}",
         f"Statut actuel : {projet.get('statut')}",
         f"Dates prévues du projet : {projet.get('date_debut') or 'N/A'} au {projet.get('date_fin') or 'N/A'}",
+    ]
+    if periode_debut and periode_fin:
+        lignes.append(
+            f"⚠️ PÉRIODE DU RAPPORT : ce rapport ne couvre QUE la période du {periode_debut} au {periode_fin} — "
+            f"toutes les données ci-dessous sont déjà filtrées sur cette période (sauf les indicateurs, en cumulé "
+            f"depuis le début du projet jusqu'à la fin de cette période). Précise cette période dans le rapport."
+        )
+    lignes.append(f"Niveau de détail attendu ({modele_rapport}) : {niveau_detail}")
+    lignes += [
         f"Budget prévisionnel du projet (détail par rubriques) : {reference_budget:,.0f} {projet.get('devise_principale') or 'FCFA'}".replace(",", " "),
         f"Dépenses réelles enregistrées à ce jour : {depense_reelle_total:,.0f} {projet.get('devise_principale') or 'FCFA'} (taux d'exécution : {taux_execution:.0f}%)".replace(",", " "),
         f"Période effective d'activités/tâches observée : {periode_min or 'N/A'} au {periode_max or 'N/A'}",
@@ -280,7 +326,7 @@ actionnables pour un chef de projet. Sois direct, sans préambule ni conclusion.
     return "".join(block.text for block in response.content if hasattr(block, "text"))
 
 
-def generate_execution_report(snapshot: ProjectSnapshot, model: str = "claude-sonnet-5") -> str:
+def generate_execution_report(snapshot: ProjectSnapshot, model: str = "claude-sonnet-5", modele_rapport: str = "Standard", periode_debut=None, periode_fin=None) -> str:
     """Génère un rapport d'exécution via l'API Anthropic Claude."""
     api_key = st.secrets.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -289,7 +335,7 @@ def generate_execution_report(snapshot: ProjectSnapshot, model: str = "claude-so
         )
 
     risques = detect_delays_and_risks(snapshot)
-    prompt = _build_prompt(snapshot, risques)
+    prompt = _build_prompt(snapshot, risques, modele_rapport=modele_rapport, periode_debut=periode_debut, periode_fin=periode_fin)
 
     client = anthropic.Anthropic(api_key=api_key)
     response = client.messages.create(

@@ -49,7 +49,6 @@ def afficher_notifications(df, prefix):
                         if not notif["lu"]:
                             crud.mark_notification_read(notif["id"])
                         st.session_state["jump_to_projet_id"] = int(notif["projet_id"])
-                        st.session_state["hub_active_section"] = "activites" if notif["activite_id"] else None
                         st.switch_page("pages/2_📂_Mes_Projets.py")
                 if not notif["lu"]:
                     if st.button("Marquer comme lu", key=f"read_notif_{prefix}_{notif['id']}", use_container_width=True):

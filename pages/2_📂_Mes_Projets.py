@@ -59,17 +59,10 @@ selected_projet_id = st.selectbox(
 
 projet_row = projets_df[projets_df["id"] == selected_projet_id].iloc[0]
 
-# Réinitialise la section active seulement si l'utilisateur change réellement de projet
-# (ne pas écraser la section déjà ouverte par la redirection post-connexion)
-if "hub_last_projet_id" in st.session_state and st.session_state["hub_last_projet_id"] != selected_projet_id:
-    st.session_state["hub_active_section"] = None
-
+# Mémorise le dernier projet consulté (redirection après connexion)
 if st.session_state.get("hub_last_projet_id") != selected_projet_id:
     st.session_state["hub_last_projet_id"] = selected_projet_id
     auth.update_last_project(current_user["id"], selected_projet_id)
-
-if "hub_active_section" not in st.session_state:
-    st.session_state["hub_active_section"] = None
 
 
 def responsable_options():
@@ -78,12 +71,6 @@ def responsable_options():
     for _, row in df.iterrows():
         options[row["id"]] = row["nom"]
     return options
-
-
-def open_section(key):
-    st.session_state["hub_active_section"] = key
-    st.session_state["just_switched_section"] = True
-    st.rerun()
 
 
 # ----------------------------------------------------------------------------
@@ -124,137 +111,8 @@ if not is_lecteur and st.session_state.get("confirm_delete_projet_id") == select
 
 st.write("")
 
-if not is_lecteur:
-    with st.expander("👥 Gérer les responsables (chefs de projet, gestionnaires, membres d'équipe)"):
-        comptes_df = crud.get_comptes_utilisateurs()
-        compte_options = {None: "— Aucun (ne recevra pas de notifications) —"}
-        for _, c in comptes_df.iterrows():
-            compte_options[c["id"]] = f"{c['username']}" + (f" ({c['nom_complet']})" if c["nom_complet"] else "")
-
-        with st.form("form_new_utilisateur", clear_on_submit=True):
-            st.markdown("**➕ Ajouter un responsable**")
-            c1, c2, c3 = st.columns(3)
-            nom_u = c1.text_input("Nom complet *")
-            email_u = c2.text_input("Email")
-            role_u = c3.text_input("Rôle (ex: Chef de projet)")
-            compte_u = st.selectbox(
-                "Compte associé (facultatif)", options=list(compte_options.keys()),
-                format_func=lambda x: compte_options[x],
-                help="Si ce responsable a aussi un compte de connexion à l'application, associez-le ici pour qu'il puisse recevoir des notifications (ex: activité à venir).",
-            )
-            if st.form_submit_button("Ajouter"):
-                if not nom_u:
-                    st.warning("Le nom est obligatoire.")
-                else:
-                    try:
-                        crud.create_utilisateur(nom_u, email_u, role_u, selected_projet_id, compte_u)
-                        st.toast(f"✅ '{nom_u}' ajouté avec succès.")
-                        st.rerun()
-                    except ValueError as e:
-                        st.error(str(e))
-
-        st.divider()
-        st.markdown(f"**📋 Responsables de « {projet_row['nom']} »**")
-        st.caption("Chaque projet a sa propre liste de responsables, indépendante des autres projets.")
-        tous_responsables_df = crud.get_utilisateurs(selected_projet_id)
-
-        if tous_responsables_df.empty:
-            st.caption("Aucun responsable enregistré pour ce projet pour l'instant.")
-        else:
-            for _, resp in tous_responsables_df.iterrows():
-                rc1, rc2, rc3 = st.columns([3, 2, 1])
-                with rc1:
-                    lien_compte = " 🔔" if resp["user_id"] else ""
-                    st.write(f"**{resp['nom']}**{lien_compte}")
-                with rc2:
-                    st.caption(f"{resp['email'] or '—'} — {resp['role'] or '—'}")
-                with rc3:
-                    if st.button("✏️", key=f"edit_resp_btn_{resp['id']}", use_container_width=True, help="Modifier / supprimer"):
-                        st.session_state["editing_resp_id"] = None if st.session_state.get("editing_resp_id") == resp["id"] else resp["id"]
-                        st.rerun()
-
-                if st.session_state.get("editing_resp_id") == resp["id"]:
-                    with st.form(f"form_edit_resp_{resp['id']}"):
-                        nom_edit_u = st.text_input("Nom complet *", value=resp["nom"])
-                        ec1, ec2 = st.columns(2)
-                        email_edit_u = ec1.text_input("Email", value=resp["email"] or "")
-                        role_edit_u = ec2.text_input("Rôle", value=resp["role"] or "")
-                        current_compte = resp["user_id"] if resp["user_id"] in compte_options else None
-                        compte_edit_u = st.selectbox(
-                            "Compte associé (facultatif)", options=list(compte_options.keys()),
-                            format_func=lambda x: compte_options[x],
-                            index=list(compte_options.keys()).index(current_compte),
-                        )
-                        col_save_u, col_del_u = st.columns(2)
-                        if col_save_u.form_submit_button("💾 Enregistrer", use_container_width=True):
-                            if not nom_edit_u:
-                                st.warning("Le nom est obligatoire.")
-                            else:
-                                try:
-                                    crud.update_utilisateur(resp["id"], nom_edit_u, email_edit_u, role_edit_u, compte_edit_u)
-                                    st.toast("✅ Responsable mis à jour avec succès.")
-                                    st.session_state["editing_resp_id"] = None
-                                    st.rerun()
-                                except ValueError as e:
-                                    st.error(str(e))
-                        if col_del_u.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                            crud.delete_utilisateur(resp["id"])
-                            st.warning("Responsable supprimé (les éléments qu'il gérait passent en 'Aucun responsable').")
-                            st.session_state["editing_resp_id"] = None
-                            st.rerun()
-
-    with st.expander("✏️ Modifier les informations du projet"):
-        utilisateurs_df_edit = crud.get_utilisateurs(selected_projet_id)
-        resp_options_edit = {None: "— Aucun —"}
-        for _, row in utilisateurs_df_edit.iterrows():
-            resp_options_edit[row["id"]] = row["nom"]
-
-        edit_projet_desc_key = f"edit_projet_description_{selected_projet_id}"
-        if edit_projet_desc_key not in st.session_state:
-            st.session_state[edit_projet_desc_key] = projet_row["description"] or ""
-
-        nom_edit = st.text_input("Nom du projet *", value=projet_row["nom"], key=f"edit_projet_nom_{selected_projet_id}")
-        description_edit = ai_text_field(
-            "Description", key=edit_projet_desc_key,
-            contexte=f"Nom du projet : {nom_edit}",
-        )
-
-        with st.form("form_edit_projet_info"):
-            c1, c2 = st.columns(2)
-            date_debut_edit = c1.date_input("Date de début", value=projet_row["date_debut"])
-            date_fin_edit = c2.date_input("Date de fin", value=projet_row["date_fin"])
-            c3, c4 = st.columns(2)
-            statut_edit = c3.selectbox(
-                "Statut", crud.STATUTS_PROJET,
-                index=crud.STATUTS_PROJET.index(projet_row["statut"]) if projet_row["statut"] in crud.STATUTS_PROJET else 0,
-            )
-            current_resp_edit = projet_row["responsable_id"] if projet_row["responsable_id"] in resp_options_edit else None
-            responsable_id_edit = c4.selectbox(
-                "Responsable", options=list(resp_options_edit.keys()),
-                format_func=lambda x: resp_options_edit[x],
-                index=list(resp_options_edit.keys()).index(current_resp_edit),
-            )
-
-            if st.form_submit_button("💾 Enregistrer", use_container_width=True):
-                if not nom_edit:
-                    st.warning("Le nom du projet est obligatoire.")
-                elif not validators.dates_valides(date_debut_edit, date_fin_edit):
-                    st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
-                else:
-                    try:
-                        crud.update_projet(
-                            selected_projet_id, nom_edit, st.session_state[edit_projet_desc_key], date_debut_edit, date_fin_edit,
-                            float(projet_row["budget"] or 0), statut_edit, responsable_id_edit,
-                        )
-                        st.toast("✅ Projet mis à jour avec succès.")
-                        st.rerun()
-                    except ValueError as e:
-                        st.error(str(e))
-
-st.write("")
-
 # ----------------------------------------------------------------------------
-# Grille de cartes — chaque section est indépendante
+# Navigation par onglets
 # ----------------------------------------------------------------------------
 objectifs_df = crud.get_objectifs(selected_projet_id)
 resultats_df = crud.get_resultats_by_projet(selected_projet_id)
@@ -263,73 +121,143 @@ taches_df = crud.get_taches_by_projet(selected_projet_id)
 parties_prenantes_df = crud.get_parties_prenantes(selected_projet_id)
 documents_df = crud.get_documents(selected_projet_id)
 
-nb_indicateurs_principaux = len(resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")]) if not resultats_df.empty else 0
-nb_indicateurs_suppl = len(crud.get_indicateurs_supplementaires_by_projet(selected_projet_id))
+(tab_informations, tab_objectifs, tab_resultats, tab_activites, tab_taches,
+ tab_budget, tab_indicateurs, tab_parties, tab_documents) = st.tabs([
+    "🏠 Informations générales", "🎯 Objectifs", "📈 Résultats", "📅 Activités", "✅ Tâches",
+    "💰 Budget", "📊 Indicateurs", "👥 Parties prenantes", "📄 Documents",
+])
 
-cards = [
-    ("objectifs", "🎯", "Objectifs (Général et Spécifiques)", len(objectifs_df)),
-    ("resultats", "📈", "Résultats attendus", len(resultats_df)),
-    ("activites", "📅", "Activités", len(activites_df)),
-    ("taches", "✅", "Tâches", len(taches_df)),
-    ("indicateurs", "📊", "Indicateurs", nb_indicateurs_principaux + nb_indicateurs_suppl),
-    ("budget", "💰", "Budget", None),
-    ("parties_prenantes", "👥", "Parties prenantes", len(parties_prenantes_df)),
-    ("documents", "📄", "Documents", len(documents_df)),
-]
+with tab_informations:
+    if not is_lecteur:
+        with st.expander("👥 Gérer les responsables (chefs de projet, gestionnaires, membres d'équipe)"):
+            comptes_df = crud.get_comptes_utilisateurs()
+            compte_options = {None: "— Aucun (ne recevra pas de notifications) —"}
+            for _, c in comptes_df.iterrows():
+                compte_options[c["id"]] = f"{c['username']}" + (f" ({c['nom_complet']})" if c["nom_complet"] else "")
 
-active = st.session_state["hub_active_section"]
+            with st.form("form_new_utilisateur", clear_on_submit=True):
+                st.markdown("**➕ Ajouter un responsable**")
+                c1, c2, c3 = st.columns(3)
+                nom_u = c1.text_input("Nom complet *")
+                email_u = c2.text_input("Email")
+                role_u = c3.text_input("Rôle (ex: Chef de projet)")
+                compte_u = st.selectbox(
+                    "Compte associé (facultatif)", options=list(compte_options.keys()),
+                    format_func=lambda x: compte_options[x],
+                    help="Si ce responsable a aussi un compte de connexion à l'application, associez-le ici pour qu'il puisse recevoir des notifications (ex: activité à venir).",
+                )
+                if st.form_submit_button("Ajouter"):
+                    if not nom_u:
+                        st.warning("Le nom est obligatoire.")
+                    else:
+                        try:
+                            crud.create_utilisateur(nom_u, email_u, role_u, selected_projet_id, compte_u)
+                            st.toast(f"✅ '{nom_u}' ajouté avec succès.")
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(str(e))
 
-# ----------------------------------------------------------------------------
-# Grille de cartes — toujours visible ; "Ouvrir" donne un accès direct à
-# chaque section (cliquer à nouveau referme la section ouverte)
-# ----------------------------------------------------------------------------
-grid_cols = st.columns(4)
-for i, (key, icon, label, count) in enumerate(cards):
-    with grid_cols[i % 4]:
-        with st.container(border=True):
-            if key in ui_style.SECTION_HELP:
-                col_label, col_info = st.columns([5, 1])
-                with col_label:
-                    st.markdown(f"**{icon} {label}**")
-                with col_info:
-                    with st.popover("ℹ️", use_container_width=True):
-                        st.write(ui_style.SECTION_HELP[key])
+            st.divider()
+            st.markdown(f"**📋 Responsables de « {projet_row['nom']} »**")
+            st.caption("Chaque projet a sa propre liste de responsables, indépendante des autres projets.")
+            tous_responsables_df = crud.get_utilisateurs(selected_projet_id)
+
+            if tous_responsables_df.empty:
+                st.caption("Aucun responsable enregistré pour ce projet pour l'instant.")
             else:
-                st.markdown(f"**{icon} {label}**")
-            if count is not None:
-                st.caption(f"{count} élément(s) enregistré(s)")
-            else:
-                st.caption("Aperçu rapide")
+                for _, resp in tous_responsables_df.iterrows():
+                    rc1, rc2, rc3 = st.columns([3, 2, 1])
+                    with rc1:
+                        lien_compte = " 🔔" if resp["user_id"] else ""
+                        st.write(f"**{resp['nom']}**{lien_compte}")
+                    with rc2:
+                        st.caption(f"{resp['email'] or '—'} — {resp['role'] or '—'}")
+                    with rc3:
+                        if st.button("✏️", key=f"edit_resp_btn_{resp['id']}", use_container_width=True, help="Modifier / supprimer"):
+                            st.session_state["editing_resp_id"] = None if st.session_state.get("editing_resp_id") == resp["id"] else resp["id"]
+                            st.rerun()
 
-            bouton_label = "🔵 Ouvert" if active == key else "Ouvrir"
-            if st.button(bouton_label, key=f"open_{key}", use_container_width=True,
-                         type="primary" if active == key else "secondary"):
-                if active == key:
-                    st.session_state["hub_active_section"] = None
-                else:
-                    st.session_state["hub_active_section"] = key
-                st.session_state["just_switched_section"] = True
-                st.rerun()
+                    if st.session_state.get("editing_resp_id") == resp["id"]:
+                        with st.form(f"form_edit_resp_{resp['id']}"):
+                            nom_edit_u = st.text_input("Nom complet *", value=resp["nom"])
+                            ec1, ec2 = st.columns(2)
+                            email_edit_u = ec1.text_input("Email", value=resp["email"] or "")
+                            role_edit_u = ec2.text_input("Rôle", value=resp["role"] or "")
+                            current_compte = resp["user_id"] if resp["user_id"] in compte_options else None
+                            compte_edit_u = st.selectbox(
+                                "Compte associé (facultatif)", options=list(compte_options.keys()),
+                                format_func=lambda x: compte_options[x],
+                                index=list(compte_options.keys()).index(current_compte),
+                            )
+                            col_save_u, col_del_u = st.columns(2)
+                            if col_save_u.form_submit_button("💾 Enregistrer", use_container_width=True):
+                                if not nom_edit_u:
+                                    st.warning("Le nom est obligatoire.")
+                                else:
+                                    try:
+                                        crud.update_utilisateur(resp["id"], nom_edit_u, email_edit_u, role_edit_u, compte_edit_u)
+                                        st.toast("✅ Responsable mis à jour avec succès.")
+                                        st.session_state["editing_resp_id"] = None
+                                        st.rerun()
+                                    except ValueError as e:
+                                        st.error(str(e))
+                            if col_del_u.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                crud.delete_utilisateur(resp["id"])
+                                st.warning("Responsable supprimé (les éléments qu'il gérait passent en 'Aucun responsable').")
+                                st.session_state["editing_resp_id"] = None
+                                st.rerun()
 
-just_switched = st.session_state.pop("just_switched_section", False)
+        with st.expander("✏️ Modifier les informations du projet"):
+            utilisateurs_df_edit = crud.get_utilisateurs(selected_projet_id)
+            resp_options_edit = {None: "— Aucun —"}
+            for _, row in utilisateurs_df_edit.iterrows():
+                resp_options_edit[row["id"]] = row["nom"]
 
-if active is None:
-    if just_switched:
-        ui_style.scroll_to_top()
-    st.divider()
-    st.info("👆 Cliquez sur **Ouvrir** dans une carte pour gérer cette section.")
-    st.stop()
+            edit_projet_desc_key = f"edit_projet_description_{selected_projet_id}"
+            if edit_projet_desc_key not in st.session_state:
+                st.session_state[edit_projet_desc_key] = projet_row["description"] or ""
 
-st.divider()
-ui_style.scroll_anchor("section-content-anchor")
-if just_switched:
-    ui_style.scroll_to_element("section-content-anchor")
+            nom_edit = st.text_input("Nom du projet *", value=projet_row["nom"], key=f"edit_projet_nom_{selected_projet_id}")
+            description_edit = ai_text_field(
+                "Description", key=edit_projet_desc_key,
+                contexte=f"Nom du projet : {nom_edit}",
+            )
 
-# ==============================================================================
-# SECTION : OBJECTIFS
-# ==============================================================================
+            with st.form("form_edit_projet_info"):
+                c1, c2 = st.columns(2)
+                date_debut_edit = c1.date_input("Date de début", value=projet_row["date_debut"])
+                date_fin_edit = c2.date_input("Date de fin", value=projet_row["date_fin"])
+                c3, c4 = st.columns(2)
+                statut_edit = c3.selectbox(
+                    "Statut", crud.STATUTS_PROJET,
+                    index=crud.STATUTS_PROJET.index(projet_row["statut"]) if projet_row["statut"] in crud.STATUTS_PROJET else 0,
+                )
+                current_resp_edit = projet_row["responsable_id"] if projet_row["responsable_id"] in resp_options_edit else None
+                responsable_id_edit = c4.selectbox(
+                    "Responsable", options=list(resp_options_edit.keys()),
+                    format_func=lambda x: resp_options_edit[x],
+                    index=list(resp_options_edit.keys()).index(current_resp_edit),
+                )
+
+                if st.form_submit_button("💾 Enregistrer", use_container_width=True):
+                    if not nom_edit:
+                        st.warning("Le nom du projet est obligatoire.")
+                    elif not validators.dates_valides(date_debut_edit, date_fin_edit):
+                        st.warning("⚠️ La date de fin ne peut pas être antérieure à la date de début.")
+                    else:
+                        try:
+                            crud.update_projet(
+                                selected_projet_id, nom_edit, st.session_state[edit_projet_desc_key], date_debut_edit, date_fin_edit,
+                                float(projet_row["budget"] or 0), statut_edit, responsable_id_edit,
+                            )
+                            st.toast("✅ Projet mis à jour avec succès.")
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(str(e))
+
+
 if is_lecteur:
-    if active == "objectifs":
+    with tab_objectifs:
         section_title("🎯", "Objectifs (Général et Spécifiques)", ui_style.SECTION_HELP["objectifs"])
         tip("objectifs_smart", "Utilisez des objectifs SMART : Spécifiques, Mesurables, Atteignables, Réalistes, Temporellement définis.")
         if objectifs_df.empty:
@@ -342,7 +270,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "resultats":
+    with tab_resultats:
         section_title("📈", "Résultats attendus", ui_style.SECTION_HELP["resultats"])
         tip("resultats_indicateurs", "Les indicateurs doivent être mesurables — préférez un chiffre précis à une appréciation générale.")
         if resultats_df.empty:
@@ -356,7 +284,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "activites":
+    with tab_activites:
         section_title("📅", "Activités", ui_style.SECTION_HELP["activites"])
         if activites_df.empty:
             st.info("Aucune activité pour ce projet.")
@@ -369,7 +297,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "taches":
+    with tab_taches:
         section_title("✅", "Tâches", ui_style.SECTION_HELP["taches"])
         if taches_df.empty:
             st.info("Aucune tâche pour ce projet.")
@@ -382,7 +310,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "indicateurs":
+    with tab_indicateurs:
         section_title("📊", "Indicateurs de suivi")
         tip("indicateurs_mesurables", "Les indicateurs doivent être mesurables : donnez toujours une valeur cible et une unité claire.")
         indicateurs_df_ro = resultats_df[resultats_df["indicateur"].notna() & (resultats_df["indicateur"] != "")] if not resultats_df.empty else resultats_df
@@ -397,7 +325,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "budget":
+    with tab_budget:
         section_title("💰", "Budget du projet")
         tip("budget_fixe_variable", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
 
@@ -443,7 +371,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "parties_prenantes":
+    with tab_parties:
         section_title("👥", "Parties prenantes")
         if parties_prenantes_df.empty:
             st.info("Aucune partie prenante enregistrée pour ce projet.")
@@ -455,7 +383,7 @@ if is_lecteur:
                 use_container_width=True, hide_index=True,
             )
 
-    elif active == "documents":
+    with tab_documents:
         section_title("📄", "Documents")
         if documents_df.empty:
             st.info("Aucun document pour ce projet.")
@@ -488,7 +416,7 @@ if is_lecteur:
                             st.caption("⚠️ Fichier introuvable")
 
 else:
-    if active == "objectifs":
+    with tab_objectifs:
         section_title("🎯", "Objectifs (Général et Spécifiques)", ui_style.SECTION_HELP["objectifs"])
         tip("objectifs_smart_2", "Utilisez des objectifs SMART : Spécifiques, Mesurables, Atteignables, Réalistes, Temporellement définis.")
 
@@ -579,14 +507,13 @@ else:
     # ==============================================================================
     # SECTION : RÉSULTATS
     # ==============================================================================
-    elif active == "resultats":
+    with tab_resultats:
         section_title("📈", "Résultats attendus", ui_style.SECTION_HELP["resultats"])
         tip("resultats_indicateurs_2", "Les indicateurs doivent être mesurables — préférez un chiffre précis à une appréciation générale.")
 
         if objectifs_df.empty:
             st.warning("Créez d'abord un objectif pour pouvoir y attacher un résultat.")
-            if st.button("🎯 Ouvrir la section Objectifs"):
-                open_section("objectifs")
+            st.caption("👉 Rendez-vous dans l'onglet **🎯 Objectifs** ci-dessus pour en créer un.")
         else:
             with st.expander("➕ Ajouter un résultat attendu"):
                 obj_options = {row["id"]: row["titre"] for _, row in objectifs_df.iterrows()}
@@ -860,13 +787,12 @@ else:
     # ==============================================================================
     # SECTION : ACTIVITÉS
     # ==============================================================================
-    elif active == "activites":
+    with tab_activites:
         section_title("📅", "Activités", ui_style.SECTION_HELP["activites"])
 
         if resultats_df.empty:
             st.warning("Créez d'abord un résultat attendu pour pouvoir y attacher une activité.")
-            if st.button("📈 Ouvrir la section Résultats"):
-                open_section("resultats")
+            st.caption("👉 Rendez-vous dans l'onglet **📈 Résultats** ci-dessus pour en créer un.")
         else:
             with st.expander("➕ Ajouter une activité"):
                 res_options = {row["id"]: f"{row['titre']} ({row['objectif_titre']})" for _, row in resultats_df.iterrows()}
@@ -1053,13 +979,12 @@ else:
     # ==============================================================================
     # SECTION : TÂCHES
     # ==============================================================================
-    elif active == "taches":
+    with tab_taches:
         section_title("✅", "Tâches", ui_style.SECTION_HELP["taches"])
 
         if activites_df.empty:
             st.warning("Créez d'abord une activité pour pouvoir y attacher une tâche.")
-            if st.button("📅 Ouvrir la section Activités"):
-                open_section("activites")
+            st.caption("👉 Rendez-vous dans l'onglet **📅 Activités** ci-dessus pour en créer une.")
         else:
             with st.expander("➕ Ajouter une tâche"):
                 act_options = {row["id"]: f"{row['titre']} ({row['resultat_titre']})" for _, row in activites_df.iterrows()}
@@ -1195,7 +1120,7 @@ else:
     # ==============================================================================
     # SECTION : INDICATEURS (vue transversale sur tous les résultats du projet)
     # ==============================================================================
-    elif active == "indicateurs":
+    with tab_indicateurs:
         section_title("📊", "Indicateurs de suivi")
         tip("indicateurs_mesurables_2", "Les indicateurs doivent être mesurables : donnez toujours une valeur cible et une unité claire.")
         st.caption("Mettez à jour rapidement la valeur actuelle de chaque indicateur, sans naviguer dans la hiérarchie.")
@@ -1208,8 +1133,7 @@ else:
                 "Aucun indicateur défini. Les indicateurs se définissent au niveau des résultats attendus "
                 "(champ « Indicateur » du formulaire, ou bouton « ➕ Ajouter un indicateur »)."
             )
-            if st.button("📈 Ouvrir la section Résultats"):
-                open_section("resultats")
+            st.caption("👉 Rendez-vous dans l'onglet **📈 Résultats** ci-dessus pour en créer un.")
         else:
             for _, row in indicateurs_df.iterrows():
                 with st.container(border=True):
@@ -1250,7 +1174,7 @@ else:
     # ==============================================================================
     # SECTION : BUDGET
     # ==============================================================================
-    elif active == "budget":
+    with tab_budget:
         section_title("💰", "Budget du projet")
         tip("budget_fixe_variable_2", "Pensez à distinguer les coûts fixes (équipements, infrastructure) et variables (consommables, main-d'œuvre).")
 
@@ -1524,7 +1448,7 @@ else:
     # ==============================================================================
     # SECTION : PARTIES PRENANTES
     # ==============================================================================
-    elif active == "parties_prenantes":
+    with tab_parties:
         section_title("👥", "Parties prenantes")
         st.caption("Partenaires, bailleurs, bénéficiaires ou communautés associés à ce projet.")
 
@@ -1584,7 +1508,7 @@ else:
     # ==============================================================================
     # SECTION : DOCUMENTS
     # ==============================================================================
-    elif active == "documents":
+    with tab_documents:
         section_title("📄", "Documents")
         st.caption("Rapports, contrats, fiches projet ou photos liés à ce projet.")
 
@@ -1657,3 +1581,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

@@ -15,11 +15,13 @@ SEUIL_RETARD = 70         # % cumulé en dessous duquel c'est "en retard"
                           # (en dessous de ce seuil -> "critique")
 
 
-def generer_periodes(date_debut_projet, date_fin_projet, frequence, cible_finale=0):
+def generer_periodes(date_debut_projet, date_fin_projet, frequence, cible_finale=0, baseline=0):
     """
-    Génère la liste des périodes calées sur le calendrier entre les dates du
-    projet, avec une cible par période pré-remplie par répartition égale de la
-    cible finale (modifiable ensuite par l'utilisateur).
+    Génère la liste des périodes calées sur le calendrier entre les dates
+    choisies, avec une cible par période pré-remplie par répartition égale de
+    (cible finale - baseline) — la baseline représente un acquis de départ,
+    seul l'écart restant à parcourir doit être réparti dans le temps.
+    Modifiable ensuite par l'utilisateur, période par période.
 
     Retourne une liste de dicts : {label, date_debut, date_fin, cible_periode}
     """
@@ -78,10 +80,12 @@ def generer_periodes(date_debut_projet, date_fin_projet, frequence, cible_finale
         if debut_clip <= fin_clip:
             periodes.append({"label": label, "date_debut": debut_clip, "date_fin": fin_clip})
 
-    # Répartition égale de la cible finale entre les périodes générées
+    # Répartition égale de l'écart (cible finale - baseline) entre les périodes —
+    # la baseline est un acquis de départ, pas une part du chemin à parcourir.
+    valeur_a_repartir = (cible_finale or 0) - (baseline or 0)
     nb = len(periodes)
-    if nb and cible_finale:
-        cible_par_periode = round(cible_finale / nb, 2)
+    if nb and valeur_a_repartir:
+        cible_par_periode = round(valeur_a_repartir / nb, 2)
         for p in periodes:
             p["cible_periode"] = cible_par_periode
     else:

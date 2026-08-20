@@ -621,7 +621,7 @@ else:
                                     st.warning("⚠️ La date de fin de ventilation ne peut pas être antérieure à la date de début.")
                                 else:
                                     nouvelles_periodes = indicateurs_temporels.generer_periodes(
-                                        date_debut_vent, date_fin_vent, nouvelle_freq, cible_finale=res["valeur_cible"] or 0,
+                                        date_debut_vent, date_fin_vent, nouvelle_freq, cible_finale=res["valeur_cible"] or 0, baseline=res["baseline"] or 0,
                                     )
                                     if not nouvelles_periodes:
                                         st.warning("Impossible de générer des périodes — vérifiez les dates de ventilation.")
@@ -715,7 +715,7 @@ else:
                                             st.warning("⚠️ La date de fin de ventilation ne peut pas être antérieure à la date de début.")
                                         else:
                                             nouvelles_periodes_ind = indicateurs_temporels.generer_periodes(
-                                                date_debut_vent_ind, date_fin_vent_ind, nouvelle_freq_ind, cible_finale=ind["valeur_cible"] or 0,
+                                                date_debut_vent_ind, date_fin_vent_ind, nouvelle_freq_ind, cible_finale=ind["valeur_cible"] or 0, baseline=ind["baseline"] or 0,
                                             )
                                             if not nouvelles_periodes_ind:
                                                 st.warning("Impossible de générer des périodes — vérifiez les dates de ventilation.")
@@ -1601,3 +1601,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

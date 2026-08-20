@@ -1067,7 +1067,7 @@ def get_toutes_periodes_projet(projet_id):
     Dashboard et le rapport IA."""
     periodes_resultats = run_query("""
         SELECT IP.id, IP.periode_label, IP.date_debut, IP.date_fin, IP.cible_periode, IP.realise_periode,
-               R.indicateur AS nom_indicateur, O.titre AS objectif_titre
+               R.indicateur AS nom_indicateur, O.titre AS objectif_titre, CONCAT('R', IP.resultat_id) AS indicateur_key
         FROM Indicateur_Periodes IP
         JOIN Resultats R ON IP.resultat_id = R.id
         JOIN Objectifs O ON R.objectif_id = O.id
@@ -1075,7 +1075,7 @@ def get_toutes_periodes_projet(projet_id):
     """, params=(projet_id,))
     periodes_suppl = run_query("""
         SELECT IP.id, IP.periode_label, IP.date_debut, IP.date_fin, IP.cible_periode, IP.realise_periode,
-               I.nom AS nom_indicateur, O.titre AS objectif_titre
+               I.nom AS nom_indicateur, O.titre AS objectif_titre, CONCAT('S', IP.indicateur_supplementaire_id) AS indicateur_key
         FROM Indicateur_Periodes IP
         JOIN Indicateurs_Supplementaires I ON IP.indicateur_supplementaire_id = I.id
         JOIN Resultats R ON I.resultat_id = R.id

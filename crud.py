@@ -277,21 +277,21 @@ def get_activites(resultat_id):
     """, params=(resultat_id,))
 
 
-def create_activite(resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id=None):
+def create_activite(resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id=None, observation=None):
     new_id = run_execute(
-        "INSERT INTO Activites (resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id),
+        "INSERT INTO Activites (resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id, observation) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (resultat_id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id, observation),
     )
     get_activites_by_projet.clear()
     return new_id
 
 
-def update_activite(id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id=None):
+def update_activite(id, titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id=None, observation=None):
     run_execute(
         "UPDATE Activites SET titre=%s, description=%s, responsable_id=%s, date_debut=%s, date_fin=%s, statut=%s, budget=%s, progression=%s, "
-        "depend_de_activite_id=%s WHERE id=%s",
-        (titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id, id),
+        "depend_de_activite_id=%s, observation=%s WHERE id=%s",
+        (titre, description, responsable_id, date_debut, date_fin, statut, budget, progression, depend_de_activite_id, observation, id),
     )
     get_activites_by_projet.clear()
 
@@ -409,7 +409,7 @@ def get_activites_by_projet(projet_id):
     return run_query("""
         SELECT A.id, A.titre, A.description, A.statut, A.budget, A.progression, A.date_debut, A.date_fin,
                A.responsable_id, U.nom AS responsable, A.resultat_id, R.titre AS resultat_titre,
-               A.depend_de_activite_id, P.titre AS depend_de_titre
+               A.depend_de_activite_id, P.titre AS depend_de_titre, A.observation
         FROM Activites A
         JOIN Resultats R ON A.resultat_id = R.id
         JOIN Objectifs O ON R.objectif_id = O.id

@@ -825,6 +825,10 @@ else:
                         options=list(depend_options.keys()), format_func=lambda x: depend_options[x],
                         help="Nécessaire pour calculer le chemin critique dans le diagramme de Gantt. Les options marquées ⚠️ seront refusées à l'enregistrement.",
                     )
+                    observation_a = st.text_area(
+                        "Observation (facultatif)", placeholder="Difficultés, contraintes ou événements particuliers rencontrés...",
+                        help="Utilisée par l'IA pour expliquer un taux de réalisation dans les rapports générés, pas seulement le constater.",
+                    )
                     if st.form_submit_button("Ajouter"):
                         date_fin_predecesseur_a = (
                             activites_df[activites_df["id"] == depend_de_a].iloc[0]["date_fin"]
@@ -841,7 +845,7 @@ else:
                                 f"qui se termine après sa propre date de début. Corrigez les dates ou changez la dépendance."
                             )
                         else:
-                            crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a, depend_de_a)
+                            crud.create_activite(resultat_id, titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_a, budget_a, progression_a, depend_de_a, observation_a)
                             st.session_state.pop("act_suggestions", None)
                             st.toast("✅ Activité ajoutée avec succès.")
                             st.rerun()
@@ -911,6 +915,12 @@ else:
                                 )
                                 st.caption("💡 Basé sur la date de début actuellement enregistrée — si vous modifiez cette date dans le formulaire, les repères ✅/⚠️ ne se mettront à jour qu'après l'enregistrement.")
 
+                                observation_edit_a = st.text_area(
+                                    "Observation (facultatif)", value=act["observation"] or "",
+                                    placeholder="Difficultés, contraintes ou événements particuliers rencontrés...",
+                                    help="Utilisée par l'IA pour expliquer un taux de réalisation dans les rapports générés, pas seulement le constater.",
+                                )
+
                                 col_save, col_delete = st.columns(2)
                                 if col_save.form_submit_button("💾 Enregistrer", use_container_width=True):
                                     date_fin_predecesseur_edit = (
@@ -932,7 +942,7 @@ else:
                                         # calculés automatiquement plutôt que d'écraser avec les champs désactivés.
                                         progression_finale = float(act["progression"] or 0) if a_des_taches else progression_a
                                         statut_final = act["statut"] if a_des_taches else statut_a
-                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_final, budget_a, progression_finale, depend_de_a)
+                                        crud.update_activite(act["id"], titre_a, description_a, responsable_id_a, date_debut_a, date_fin_a, statut_final, budget_a, progression_finale, depend_de_a, observation_edit_a)
                                         st.toast("✅ Activité mise à jour avec succès.")
                                         st.session_state["editing_act_id"] = None
                                         st.rerun()

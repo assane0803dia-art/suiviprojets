@@ -138,7 +138,16 @@ def _build_prompt(snapshot: ProjectSnapshot, risques: dict) -> str:
     lignes.append("")
     lignes.append("ACTIVITÉS (réalisées ou en cours) :")
     for a in snapshot.activites:
-        lignes.append(f"- {a.get('titre')} — statut : {a.get('statut')}, progression : {a.get('progression') or 0}%")
+        ligne = f"- {a.get('titre')} — statut : {a.get('statut')}, progression : {a.get('progression') or 0}%"
+        if a.get("observation"):
+            ligne += f" — observation du responsable : « {a.get('observation')} »"
+        lignes.append(ligne)
+    lignes.append(
+        "Consigne pour les activités ci-dessus : quand une observation existe, utilise-la pour EXPLIQUER "
+        "le taux de réalisation (pas seulement le constater) — par exemple relier un retard à la cause "
+        "rapportée. N'invente JAMAIS de cause si aucune observation n'est renseignée ; dans ce cas, "
+        "contente-toi de constater le taux sans supposer de raison."
+    )
 
     lignes.append("")
     lignes.append("ACTIVITÉS EN RETARD (date de fin dépassée, non terminées) :")

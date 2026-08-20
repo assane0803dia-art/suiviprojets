@@ -640,18 +640,23 @@ else:
                                 )
                                 badge_par_statut = {"Conforme": "success", "En avance": "success", "En retard": "warning", "Critique": "danger", "À venir": "muted"}
                                 with st.form(f"form_periodes_res_{res['id']}"):
+                                    hcol1, hcol2, hcol3, hcol4 = st.columns([2, 1.3, 1.3, 1.6])
+                                    hcol2.caption("Cible")
+                                    hcol3.caption("Réalisé")
                                     for pc in periodes_calc:
                                         pcol1, pcol2, pcol3, pcol4 = st.columns([2, 1.3, 1.3, 1.6])
                                         pcol1.write(f"**{pc['label']}**")
-                                        pcol2.caption(f"Cible : {pc['cible_periode']:.1f}")
+                                        pc["cible_edit"] = pcol2.number_input(
+                                            "Cible", value=float(pc["cible_periode"] or 0), key=f"cible_{pc['id']}", label_visibility="collapsed",
+                                        )
                                         pc["realise_edit"] = pcol3.number_input(
                                             "Réalisé", value=float(pc["realise_periode"] or 0), key=f"realise_{pc['id']}", label_visibility="collapsed",
                                         )
                                         pcol4.markdown(badge_html(pc["statut"], badge_par_statut.get(pc["statut"], "muted")), unsafe_allow_html=True)
-                                    if st.form_submit_button("💾 Enregistrer les réalisations", use_container_width=True):
+                                    if st.form_submit_button("💾 Enregistrer", use_container_width=True):
                                         for pc in periodes_calc:
-                                            crud.update_periode(pc["id"], pc["cible_periode"], pc["realise_edit"], est_resultat=True)
-                                        st.toast("✅ Réalisations enregistrées avec succès.")
+                                            crud.update_periode(pc["id"], pc["cible_edit"], pc["realise_edit"], est_resultat=True)
+                                        st.toast("✅ Périodes mises à jour avec succès.")
                                         st.rerun()
 
                             for _, ind in indicateurs_suppl.iterrows():
@@ -734,17 +739,22 @@ else:
                                         )
                                         badge_par_statut_ind = {"Conforme": "success", "En avance": "success", "En retard": "warning", "Critique": "danger", "À venir": "muted"}
                                         with st.form(f"form_periodes_ind_{ind['id']}"):
+                                            hcol1_ind, hcol2_ind, hcol3_ind, hcol4_ind = st.columns([2, 1.3, 1.3, 1.6])
+                                            hcol2_ind.caption("Cible")
+                                            hcol3_ind.caption("Réalisé")
                                             for pc in periodes_ind_calc:
                                                 pcol1, pcol2, pcol3, pcol4 = st.columns([2, 1.3, 1.3, 1.6])
                                                 pcol1.write(f"**{pc['label']}**")
-                                                pcol2.caption(f"Cible : {pc['cible_periode']:.1f}")
+                                                pc["cible_edit"] = pcol2.number_input(
+                                                    "Cible", value=float(pc["cible_periode"] or 0), key=f"cible_ind_{pc['id']}", label_visibility="collapsed",
+                                                )
                                                 pc["realise_edit"] = pcol3.number_input(
                                                     "Réalisé", value=float(pc["realise_periode"] or 0), key=f"realise_ind_{pc['id']}", label_visibility="collapsed",
                                                 )
                                                 pcol4.markdown(badge_html(pc["statut"], badge_par_statut_ind.get(pc["statut"], "muted")), unsafe_allow_html=True)
-                                            if st.form_submit_button("💾 Enregistrer les réalisations", use_container_width=True):
+                                            if st.form_submit_button("💾 Enregistrer", use_container_width=True):
                                                 for pc in periodes_ind_calc:
-                                                    crud.update_periode(pc["id"], pc["cible_periode"], pc["realise_edit"], est_resultat=False)
+                                                    crud.update_periode(pc["id"], pc["cible_edit"], pc["realise_edit"], est_resultat=False)
                                                 st.toast("✅ Réalisations enregistrées avec succès.")
                                                 st.rerun()
 
@@ -1601,4 +1611,3 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
-

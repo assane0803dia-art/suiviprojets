@@ -396,7 +396,7 @@ def recalculate_activite_progression(activite_id):
 def get_resultats_by_projet(projet_id):
     return run_query("""
         SELECT R.id, R.titre, R.description, R.indicateur, R.valeur_cible, R.valeur_actuelle, R.unite, R.statut,
-               R.source_verification, R.baseline, R.objectif_id, O.titre AS objectif_titre
+               R.source_verification, R.baseline, R.objectif_id, O.titre AS objectif_titre, R.frequence_ventilation
         FROM Resultats R
         JOIN Objectifs O ON R.objectif_id = O.id
         WHERE O.projet_id = %s
@@ -524,7 +524,7 @@ def get_indicateurs_supplementaires(resultat_id):
 def get_indicateurs_supplementaires_by_projet(projet_id):
     return run_query(
         """SELECT I.id, I.nom, I.valeur_cible, I.valeur_actuelle, I.unite, I.baseline, I.source_verification,
-                  R.titre AS resultat_titre, O.titre AS objectif_titre
+                  R.titre AS resultat_titre, O.titre AS objectif_titre, I.frequence_ventilation
            FROM Indicateurs_Supplementaires I
            JOIN Resultats R ON I.resultat_id = R.id
            JOIN Objectifs O ON R.objectif_id = O.id
@@ -994,6 +994,99 @@ def notifier_nouvelle_affectation(user_id, projet_id, projet_nom, ajoute_par_nom
         message=f"Vous avez été ajouté au projet « {projet_nom} » par {ajoute_par_nom} (rôle : {role}).",
         projet_id=projet_id,
     )
+
+
+# ----------------------------------------------------------------------------
+# Ventilation temporelle des indicateurs
+# ----------------------------------------------------------------------------
+@st.cache_data(ttl=15)
+def get_periodes_resultat(resultat_id):
+    return run_query(
+        "SELECT id, periode_label, date_debut, date_fin, cible_periode, realise_periode "
+        "FROM Indicateur_Periodes WHERE resultat_id = %s ORDER BY date_debut",
+        params=(resultat_id,),
+    )
+
+
+@st.cache_data(ttl=15)
+def get_periodes_indicateur_supplementaire(indicateur_id):
+    return run_query(
+        "SELECT id, periode_label, date_debut, date_fin, cible_periode, realise_periode "
+        "FROM Indicateur_Periodes WHERE indicateur_supplementaire_id = %s ORDER BY date_debut",
+        params=(indicateur_id,),
+    )
+
+
+def set_frequence_ventilation_resultat(resultat_id, frequence):
+    run_execute("UPDATE Resultats SET frequence_ventilation=%s WHERE id=%s", (frequence, resultat_id))
+    get_resultats_by_projet.clear()
+
+
+def set_frequence_ventilation_indicateur_suppl(indicateur_id, frequence):
+    run_execute("UPDATE Indicateurs_Supplementaires SET frequence_ventilation=%s WHERE id=%s", (frequence, indicateur_id))
+    get_indicateurs_supplementaires_by_projet.clear()
+
+
+def regenerer_periodes_resultat(resultat_id, periodes):
+    """Remplace toutes les périodes existantes d'un résultat par la nouvelle liste
+    générée — les réalisations déjà saisies sont perdues si on régénère, d'où la
+    confirmation demandée côté interface avant d'appeler cette fonction."""
+    run_execute("DELETE FROM Indicateur_Periodes WHERE resultat_id=%s", (resultat_id,))
+    for p in periodes:
+        run_execute(
+            "INSERT INTO Indicateur_Periodes (resultat_id, periode_label, date_debut, date_fin, cible_periode) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (resultat_id, p["label"], p["date_debut"], p["date_fin"], p["cible_periode"]),
+        )
+    get_periodes_resultat.clear()
+
+
+def regenerer_periodes_indicateur_suppl(indicateur_id, periodes):
+    run_execute("DELETE FROM Indicateur_Periodes WHERE indicateur_supplementaire_id=%s", (indicateur_id,))
+    for p in periodes:
+        run_execute(
+            "INSERT INTO Indicateur_Periodes (indicateur_supplementaire_id, periode_label, date_debut, date_fin, cible_periode) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (indicateur_id, p["label"], p["date_debut"], p["date_fin"], p["cible_periode"]),
+        )
+    get_periodes_indicateur_supplementaire.clear()
+
+
+def update_periode(id, cible_periode, realise_periode, est_resultat=True):
+    run_execute("UPDATE Indicateur_Periodes SET cible_periode=%s, realise_periode=%s WHERE id=%s", (cible_periode, realise_periode, id))
+    if est_resultat:
+        get_periodes_resultat.clear()
+    else:
+        get_periodes_indicateur_supplementaire.clear()
+
+
+@st.cache_data(ttl=15)
+def get_toutes_periodes_projet(projet_id):
+    """Toutes les périodes de tous les indicateurs (résultats + suppl.) d'un
+    projet, avec le nom de l'indicateur et l'objectif associé — utilisé pour le
+    Dashboard et le rapport IA."""
+    periodes_resultats = run_query("""
+        SELECT IP.id, IP.periode_label, IP.date_debut, IP.date_fin, IP.cible_periode, IP.realise_periode,
+               R.indicateur AS nom_indicateur, O.titre AS objectif_titre
+        FROM Indicateur_Periodes IP
+        JOIN Resultats R ON IP.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        WHERE O.projet_id = %s
+    """, params=(projet_id,))
+    periodes_suppl = run_query("""
+        SELECT IP.id, IP.periode_label, IP.date_debut, IP.date_fin, IP.cible_periode, IP.realise_periode,
+               I.nom AS nom_indicateur, O.titre AS objectif_titre
+        FROM Indicateur_Periodes IP
+        JOIN Indicateurs_Supplementaires I ON IP.indicateur_supplementaire_id = I.id
+        JOIN Resultats R ON I.resultat_id = R.id
+        JOIN Objectifs O ON R.objectif_id = O.id
+        WHERE O.projet_id = %s
+    """, params=(projet_id,))
+    import pandas as pd
+    return pd.concat([periodes_resultats, periodes_suppl], ignore_index=True)
+
+
+FREQUENCES_VENTILATION = ["aucune", "hebdomadaire", "mensuelle", "trimestrielle", "semestrielle", "annuelle"]
 
 
 # ----------------------------------------------------------------------------

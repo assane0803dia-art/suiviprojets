@@ -9,6 +9,7 @@ import ui_style
 import crud
 import storage_service
 import validators
+import indicateurs_temporels
 import ai_text_assist
 
 require_login()
@@ -666,6 +667,55 @@ else:
                             st.caption(f"**Principal** — {res['indicateur'] or 'Sans nom'} : {res['valeur_actuelle']}/{res['valeur_cible']} {res['unite'] or ''} *(modifiable via « ✏️ Modifier » ci-dessus)*")
                             if res["baseline"] or res["source_verification"]:
                                 st.caption(f"　　Baseline : {res['baseline'] if res['baseline'] is not None else '—'} · Source de vérification : {res['source_verification'] or '—'}")
+
+                            st.write("")
+                            st.markdown("**📅 Ventilation temporelle (indicateur principal)**")
+                            freq_options = crud.FREQUENCES_VENTILATION
+                            freq_actuelle = res["frequence_ventilation"] if res["frequence_ventilation"] in freq_options else "aucune"
+                            nouvelle_freq = st.selectbox(
+                                "Fréquence", freq_options, index=freq_options.index(freq_actuelle),
+                                key=f"freq_res_{res['id']}",
+                                help="Planifie une cible par période, pour détecter un retard avant la fin du projet plutôt qu'à la toute fin.",
+                            )
+                            if st.button("🔄 Générer / régénérer les périodes", key=f"gen_periodes_res_{res['id']}"):
+                                if nouvelle_freq != freq_actuelle:
+                                    crud.set_frequence_ventilation_resultat(res["id"], nouvelle_freq)
+                                if nouvelle_freq == "aucune":
+                                    crud.regenerer_periodes_resultat(res["id"], [])
+                                else:
+                                    nouvelles_periodes = indicateurs_temporels.generer_periodes(
+                                        projet_row["date_debut"], projet_row["date_fin"], nouvelle_freq, cible_finale=res["valeur_cible"] or 0,
+                                    )
+                                    if not nouvelles_periodes:
+                                        st.warning("Impossible de générer des périodes — vérifiez que le projet a bien une date de début et une date de fin.")
+                                    else:
+                                        crud.regenerer_periodes_resultat(res["id"], nouvelles_periodes)
+                                        st.toast(f"✅ {len(nouvelles_periodes)} période(s) générée(s).")
+                                        st.rerun()
+
+                            periodes_res = crud.get_periodes_resultat(res["id"])
+                            if not periodes_res.empty:
+                                periodes_liste = periodes_res.to_dict("records")
+                                for p in periodes_liste:
+                                    p["date_debut"] = p["date_debut"]
+                                periodes_calc = indicateurs_temporels.calculer_statuts_cumules(
+                                    sorted(periodes_liste, key=lambda p: p["date_debut"])
+                                )
+                                badge_par_statut = {"Conforme": "success", "En avance": "success", "En retard": "warning", "Critique": "danger", "À venir": "muted"}
+                                with st.form(f"form_periodes_res_{res['id']}"):
+                                    for pc in periodes_calc:
+                                        pcol1, pcol2, pcol3, pcol4 = st.columns([2, 1.3, 1.3, 1.6])
+                                        pcol1.write(f"**{pc['label']}**")
+                                        pcol2.caption(f"Cible : {pc['cible_periode']:.1f}")
+                                        pc["realise_edit"] = pcol3.number_input(
+                                            "Réalisé", value=float(pc["realise_periode"] or 0), key=f"realise_{pc['id']}", label_visibility="collapsed",
+                                        )
+                                        pcol4.markdown(badge_html(pc["statut"], badge_par_statut.get(pc["statut"], "muted")), unsafe_allow_html=True)
+                                    if st.form_submit_button("💾 Enregistrer les réalisations", use_container_width=True):
+                                        for pc in periodes_calc:
+                                            crud.update_periode(pc["id"], pc["cible_periode"], pc["realise_edit"], est_resultat=True)
+                                        st.toast("✅ Réalisations enregistrées avec succès.")
+                                        st.rerun()
 
                             for _, ind in indicateurs_suppl.iterrows():
                                 ic1, ic2, ic3 = st.columns([3, 1.5, 1])

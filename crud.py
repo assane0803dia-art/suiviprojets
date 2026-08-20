@@ -514,7 +514,7 @@ def update_resultat_valeur_actuelle(id, valeur_actuelle):
 # ----------------------------------------------------------------------------
 def get_indicateurs_supplementaires(resultat_id):
     return run_query(
-        "SELECT id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification "
+        "SELECT id, nom, valeur_cible, valeur_actuelle, unite, baseline, source_verification, frequence_ventilation "
         "FROM Indicateurs_Supplementaires WHERE resultat_id = %s ORDER BY date_ajout",
         params=(resultat_id,),
     )

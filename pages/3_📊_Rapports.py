@@ -1,7 +1,7 @@
 import streamlit as st
 from i18n import t
 from datetime import datetime
-from auth import require_login, logout_button, get_profile
+from auth import require_login, logout_button, get_profile, update_modele_rapport_seul, update_ia_modele_seul
 from ui_style import sidebar_brand, section_title, tip
 import crud
 import ai_report_generator as ai
@@ -71,8 +71,8 @@ with st.expander("⚙️ Paramètres du rapport", expanded=True):
         format_func=lambda x: "Claude Sonnet 5 (qualité, recommandé)" if x == "claude-sonnet-5" else "Claude Haiku 4.5 (rapide, économique)",
     )
     if (modele_rapport_choisi != (profile or {}).get("modele_rapport")) or (modele_ia_choisi != (profile or {}).get("ia_modele")):
-        crud.update_modele_rapport_seul(user["id"], modele_rapport_choisi)
-        crud.update_ia_modele_seul(user["id"], modele_ia_choisi)
+        update_modele_rapport_seul(user["id"], modele_rapport_choisi)
+        update_ia_modele_seul(user["id"], modele_ia_choisi)
 
     st.write("")
     type_periode = st.radio(

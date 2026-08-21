@@ -278,3 +278,50 @@ if is_admin:
                         crud.revoke_acces_lecteur(selected_lecteur_id, projet_id)
                 st.toast("✅ Accès mis à jour avec succès.")
                 st.rerun()
+
+        st.divider()
+        section_title("🔒", "Comptes restreints")
+        tip(
+            "comptes_restreints",
+            "Un compte restreint peut créer/modifier des projets normalement, mais ne voit QUE les "
+            "projets qui lui sont explicitement accordés ici — contrairement à un compte lecteur, qui "
+            "peut seulement consulter. Utile pour un client externe qui gère son propre projet "
+            "confidentiel, sans voir les autres projets de la plateforme.",
+        )
+
+        comptes_df = crud.get_comptes_non_lecteurs()
+        if comptes_df.empty:
+            st.info("Aucun compte admin/utilisateur pour l'instant.")
+        else:
+            compte_options_r = {row["id"]: f"{row['username']} ({row['role']})" for _, row in comptes_df.iterrows()}
+            selected_compte_id = st.selectbox("Compte", options=list(compte_options_r.keys()), format_func=lambda x: compte_options_r[x], key="select_compte_restreint")
+
+            est_restreint_actuel = bool(comptes_df[comptes_df["id"] == selected_compte_id].iloc[0]["compte_restreint"])
+            nouveau_restreint = st.toggle("Compte restreint (ne voit que les projets accordés ci-dessous)", value=est_restreint_actuel)
+            if nouveau_restreint != est_restreint_actuel:
+                crud.set_compte_restreint(selected_compte_id, nouveau_restreint)
+                st.toast("✅ Statut du compte mis à jour avec succès.")
+                st.rerun()
+
+            if nouveau_restreint:
+                projets_tous = crud.get_projets()
+                if projets_tous.empty:
+                    st.info("Aucun projet à accorder pour l'instant.")
+                else:
+                    projet_options_r = {row["id"]: row["nom"] for _, row in projets_tous.iterrows()}
+                    projets_deja_restreints = crud.get_acces_restreint(selected_compte_id)
+                    selected_projets_r = st.multiselect(
+                        "Projets accordés à ce compte",
+                        options=list(projet_options_r.keys()),
+                        default=projets_deja_restreints,
+                        format_func=lambda x: projet_options_r[x],
+                    )
+                    if st.button("💾 Enregistrer les projets accordés", use_container_width=True):
+                        for projet_id in selected_projets_r:
+                            if projet_id not in projets_deja_restreints:
+                                crud.grant_acces_restreint(selected_compte_id, projet_id)
+                        for projet_id in projets_deja_restreints:
+                            if projet_id not in selected_projets_r:
+                                crud.revoke_acces_restreint(selected_compte_id, projet_id)
+                        st.toast("✅ Projets accordés mis à jour avec succès.")
+                        st.rerun()

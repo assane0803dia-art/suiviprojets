@@ -8,7 +8,7 @@ import db
 def verify_credentials(username: str, password: str):
     """Vérifie les identifiants et retourne l'utilisateur (dict) ou None."""
     df = db.run_query(
-        "SELECT id, username, password_hash, role FROM Users WHERE username = %s AND actif = TRUE",
+        "SELECT id, username, password_hash, role, compte_restreint FROM Users WHERE username = %s AND actif = TRUE",
         params=(username,),
     )
     if df.empty:

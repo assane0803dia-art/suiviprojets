@@ -50,7 +50,10 @@ with col_refresh:
 
 st.divider()
 
-projets_df = crud.get_projets()
+if user.get("compte_restreint"):
+    projets_df = crud.get_projets_restreints(user["id"])
+else:
+    projets_df = crud.get_projets()
 
 if projets_df.empty:
     st.info("👋 Aucun projet pour l'instant. Rendez-vous dans **📁 Nouveau projet** pour créer votre premier projet.")
@@ -172,8 +175,6 @@ else:
 
     avec_cible = [i for i in indicateurs_liste if i["statut"][3] is not None]
     nb_atteints = sum(1 for i in avec_cible if i["statut"][0] == "🟢")
-    nb_en_cours = sum(1 for i in avec_cible if i["statut"][0] in ("🔵", "🟠"))
-    nb_en_retard = sum(1 for i in avec_cible if i["statut"][0] == "🔴")
     taux_global = (sum(i["statut"][3] for i in avec_cible) / len(avec_cible)) if avec_cible else 0
 
     vue_cols = st.columns(3)

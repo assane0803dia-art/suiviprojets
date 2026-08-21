@@ -34,6 +34,11 @@ if is_lecteur:
     if projets_df.empty:
         st.info("👋 Aucun projet ne vous a encore été partagé. Contactez un administrateur.")
         st.stop()
+elif current_user.get("compte_restreint"):
+    projets_df = crud.get_projets_restreints(current_user["id"])
+    if projets_df.empty:
+        st.info("👋 Aucun projet ne vous a encore été accordé. Contactez un administrateur.")
+        st.stop()
 else:
     projets_df = crud.get_projets()
     if projets_df.empty:
@@ -1611,3 +1616,4 @@ else:
                             crud.delete_document(doc["id"])
                             st.warning("Document supprimé.")
                             st.rerun()
+

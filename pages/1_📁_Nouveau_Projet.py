@@ -64,6 +64,11 @@ with st.form("form_new_projet_quick"):
                     final_responsable_id = crud.create_utilisateur(nouveau_resp_nom, nouveau_resp_email, nouveau_resp_role, new_id)
                     crud.update_projet(new_id, nom, description, date_debut, date_fin, budget, statut, final_responsable_id)
 
+                # Un compte restreint ne voit que les projets explicitement accordés —
+                # sans ça, il perdrait immédiatement de vue le projet qu'il vient de créer.
+                if st.session_state.get("user", {}).get("compte_restreint"):
+                    crud.grant_acces_restreint(st.session_state["user"]["id"], new_id)
+
                 st.session_state["jump_to_projet_id"] = new_id
                 for k in ["new_projet_nom", "new_projet_description", "new_resp_nom", "new_resp_email", "new_resp_role"]:
                     st.session_state.pop(k, None)

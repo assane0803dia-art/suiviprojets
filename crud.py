@@ -504,6 +504,51 @@ def revoke_acces_lecteur(user_id, projet_id):
     run_execute("DELETE FROM Acces_Lecteurs WHERE user_id = %s AND projet_id = %s", (user_id, projet_id))
 
 
+# ----------------------------------------------------------------------------
+# Comptes restreints — droits d'édition complets, mais uniquement sur les
+# projets explicitement accordés (ex: un client externe sur son seul projet)
+# ----------------------------------------------------------------------------
+def get_comptes_non_lecteurs():
+    """Comptes admin/utilisateur (pas lecteur), pour choisir qui restreindre."""
+    return run_query("SELECT id, username, role, compte_restreint FROM Users WHERE role != 'lecteur' AND actif = TRUE ORDER BY username")
+
+
+def set_compte_restreint(user_id, restreint: bool):
+    run_execute("UPDATE Users SET compte_restreint = %s WHERE id = %s", (restreint, user_id))
+
+
+def get_projets_restreints(user_id):
+    """Projets qu'un compte restreint est autorisé à voir ET modifier — mêmes
+    colonnes que get_projets(), pour rester utilisable de façon interchangeable."""
+    return run_query("""
+        SELECT P.id, P.nom, P.description, P.date_debut, P.date_fin, P.budget, P.statut,
+               P.responsable_id, U.nom AS responsable,
+               P.devise_principale, P.devise_secondaire, P.taux_conversion
+        FROM Projets P
+        JOIN Acces_Restreint AR ON P.id = AR.projet_id
+        LEFT JOIN Utilisateurs U ON P.responsable_id = U.id
+        WHERE AR.user_id = %s
+        ORDER BY P.nom
+    """, params=(user_id,))
+
+
+def get_acces_restreint(user_id):
+    """IDs des projets déjà accordés à ce compte restreint."""
+    df = run_query("SELECT projet_id FROM Acces_Restreint WHERE user_id = %s", params=(user_id,))
+    return df["projet_id"].tolist() if not df.empty else []
+
+
+def grant_acces_restreint(user_id, projet_id):
+    try:
+        run_execute("INSERT INTO Acces_Restreint (user_id, projet_id) VALUES (%s, %s)", (user_id, projet_id))
+    except psycopg2.errors.UniqueViolation:
+        pass
+
+
+def revoke_acces_restreint(user_id, projet_id):
+    run_execute("DELETE FROM Acces_Restreint WHERE user_id = %s AND projet_id = %s", (user_id, projet_id))
+
+
 def update_resultat_valeur_actuelle(id, valeur_actuelle):
     run_execute("UPDATE Resultats SET valeur_actuelle=%s WHERE id=%s", (valeur_actuelle, id))
     get_resultats_by_projet.clear()

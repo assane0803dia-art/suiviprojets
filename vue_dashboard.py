@@ -394,9 +394,17 @@ if not graphiques.empty:
                     activites_avec_budget,
                     x="budget", y="titre_court", orientation="h",
                     text_auto=",.0f", color_discrete_sequence=["#2563EB"],
-                    custom_data=["titre"],
                 )
-                fig.update_traces(hovertemplate="<b>%{customdata[0]}</b><br>Budget : %{x:,.0f} FCFA<extra></extra>")
+                fig.update_traces(hoverinfo="skip", hovertemplate=None)  # le survol se fait via la couche invisible ci-dessous
+                max_budget = activites_avec_budget["budget"].max()
+                fig.add_trace(go.Bar(
+                    x=[max_budget * 1.001] * len(activites_avec_budget), y=activites_avec_budget["titre_court"],
+                    orientation="h", marker=dict(color="rgba(0,0,0,0)"),
+                    customdata=activites_avec_budget[["titre", "budget"]],
+                    hovertemplate="<b>%{customdata[0]}</b><br>Budget : %{customdata[1]:,.0f} FCFA<extra></extra>",
+                    showlegend=False,
+                ))
+                fig.update_layout(barmode="overlay")
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Budget (FCFA)", yaxis_title="",
@@ -419,9 +427,16 @@ if not graphiques.empty:
                     x="progression", y="titre_court", orientation="h",
                     text_auto=".0f", color="progression",
                     color_continuous_scale=["#F59E0B", "#10B981"], range_color=[0, 100],
-                    custom_data=["titre"],
                 )
-                fig.update_traces(hovertemplate="<b>%{customdata[0]}</b><br>Progression : %{x:.0f}%<extra></extra>")
+                fig.update_traces(hoverinfo="skip", hovertemplate=None)
+                fig.add_trace(go.Bar(
+                    x=[101] * len(activites_prog), y=activites_prog["titre_court"],
+                    orientation="h", marker=dict(color="rgba(0,0,0,0)"),
+                    customdata=activites_prog[["titre", "progression"]],
+                    hovertemplate="<b>%{customdata[0]}</b><br>Progression : %{customdata[1]:.0f}%<extra></extra>",
+                    showlegend=False,
+                ))
+                fig.update_layout(barmode="overlay")
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Progression (%)", yaxis_title="",

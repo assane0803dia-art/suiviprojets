@@ -225,7 +225,7 @@ else:
         st.markdown("**📐 Progression vers la cible**")
         st.caption("Chaque barre = l'avancement actuel en % de la cible (100% = cible atteinte). Le repère ⚪ indique le point de départ (baseline).")
 
-        noms = [i["nom"][:45] for i in indicateurs_avec_donnees]
+        noms = [i["nom"] for i in indicateurs_avec_donnees]
         pct_actuel = [min((i["actuelle"] or 0) / i["cible"] * 100, 130) for i in indicateurs_avec_donnees]
         pct_baseline = [(i["baseline"] or 0) / i["cible"] * 100 for i in indicateurs_avec_donnees]
         couleurs = [i["statut"][1] for i in indicateurs_avec_donnees]
@@ -261,6 +261,7 @@ else:
         fig_evolution.update_layout(
             margin=dict(l=10, r=10, t=30, b=10), height=max(220, 42 * len(indicateurs_avec_donnees)),
             xaxis_title="% de la cible atteint", yaxis_title="", showlegend=True,
+            yaxis=dict(automargin=True),
         )
         st.plotly_chart(fig_evolution, use_container_width=True)
 
@@ -381,18 +382,23 @@ if not graphiques.empty:
         section_title(row["icone"] or "", row["libelle"])
 
         if row["cle"] == "graph_budget_projet":
-            if not activites_df.empty and "budget" in activites_df.columns:
+            activites_avec_budget = activites_df[activites_df["budget"].notna() & (activites_df["budget"] > 0)] if not activites_df.empty else activites_df
+            if not activites_avec_budget.empty:
+                nb_sans_budget = len(activites_df) - len(activites_avec_budget)
                 fig = px.bar(
-                    activites_df.sort_values("budget", ascending=True),
+                    activites_avec_budget.sort_values("budget", ascending=True),
                     x="budget", y="titre", orientation="h",
                     text_auto=",.0f", color_discrete_sequence=["#2563EB"],
                 )
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Budget (FCFA)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=320,
+                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 42 * len(activites_avec_budget)),
+                    yaxis=dict(automargin=True),
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                if nb_sans_budget > 0:
+                    st.caption(f"ℹ️ {nb_sans_budget} activité(s) sans budget renseigné, non affichée(s) ci-dessus.")
             else:
                 st.info("Aucune activité avec budget pour ce projet.")
 
@@ -407,8 +413,9 @@ if not graphiques.empty:
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Progression (%)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=320,
+                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 42 * len(activites_df)),
                     coloraxis_showscale=False,
+                    yaxis=dict(automargin=True),
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -444,7 +451,7 @@ else:
         category_orders={"titre": gantt_df["titre"].tolist()},
         hover_data={"statut": True},
     )
-    fig_gantt.update_yaxes(autorange="reversed", title="")
+    fig_gantt.update_yaxes(autorange="reversed", title="", automargin=True)
     style_plotly_chart(fig_gantt)
     fig_gantt.update_layout(
         margin=dict(l=10, r=10, t=40, b=10), height=max(200, 40 * len(gantt_df)),
@@ -497,6 +504,7 @@ else:
         xaxis_range=[0, 112],
         margin=dict(l=10, r=10, t=20, b=10), height=max(200, 45 * len(perf_df)),
         showlegend=False,
+        yaxis=dict(automargin=True),
     )
     st.plotly_chart(fig_perf, use_container_width=True)
 

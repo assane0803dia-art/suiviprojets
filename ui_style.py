@@ -9,7 +9,7 @@ import uuid
 import textwrap
 
 
-def wrap_label(texte, largeur=35):
+def wrap_label(texte, largeur=42):
     """
     Insère des retours à la ligne (<br>, compris par Plotly) dans un libellé
     long, à des coupures de mots propres — plutôt que de laisser Plotly
@@ -21,6 +21,18 @@ def wrap_label(texte, largeur=35):
     if not texte:
         return texte
     return "<br>".join(textwrap.wrap(str(texte), width=largeur, break_long_words=False))
+
+
+def hauteur_graphique_wrap(labels_wrappes, nb_categories, px_par_ligne=20, min_par_categorie=42):
+    """
+    Calcule la hauteur nécessaire pour un graphique horizontal dont les
+    libellés ont été passés par wrap_label — se base sur le nombre RÉEL de
+    lignes du libellé le plus long (pas un forfait unique), pour éviter le
+    chevauchement entre catégories voisines quand un libellé fait 4 lignes
+    et son voisin une seule.
+    """
+    max_lignes = max((str(l).count("<br>") + 1 for l in labels_wrappes), default=1)
+    return max(220, int(nb_categories * max(min_par_categorie, max_lignes * px_par_ligne + 14)))
 
 # ----------------------------------------------------------------------------
 # Palette de couleurs (inspirée des outils modernes de gestion de projet)

@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from auth import require_login, logout_button, get_last_project
-from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip, wrap_label
+from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip, wrap_label, hauteur_graphique_wrap
 from i18n import t
 from indicators_config import (
     load_all_indicators,
@@ -259,9 +259,9 @@ else:
 
         style_plotly_chart(fig_evolution)
         fig_evolution.update_layout(
-            margin=dict(l=10, r=10, t=30, b=10), height=max(220, 42 * len(indicateurs_avec_donnees)),
+            margin=dict(l=10, r=10, t=30, b=10), height=hauteur_graphique_wrap(noms, len(indicateurs_avec_donnees)),
             xaxis_title="% de la cible atteint", yaxis_title="", showlegend=True,
-            yaxis=dict(automargin=True),
+            yaxis=dict(automargin=True, tickfont=dict(size=11)),
         )
         st.plotly_chart(fig_evolution, use_container_width=True)
 
@@ -395,8 +395,8 @@ if not graphiques.empty:
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Budget (FCFA)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 55 * len(activites_avec_budget)),
-                    yaxis=dict(automargin=True),
+                    margin=dict(l=10, r=10, t=40, b=10), height=hauteur_graphique_wrap(activites_avec_budget["titre_wrap"], len(activites_avec_budget)),
+                    yaxis=dict(automargin=True, tickfont=dict(size=11)),
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 if nb_sans_budget > 0:
@@ -417,9 +417,9 @@ if not graphiques.empty:
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Progression (%)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 55 * len(activites_prog)),
+                    margin=dict(l=10, r=10, t=40, b=10), height=hauteur_graphique_wrap(activites_prog["titre_wrap"], len(activites_prog)),
                     coloraxis_showscale=False,
-                    yaxis=dict(automargin=True),
+                    yaxis=dict(automargin=True, tickfont=dict(size=11)),
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -456,10 +456,10 @@ else:
         category_orders={"titre_wrap": gantt_df["titre_wrap"].tolist()},
         hover_data={"statut": True},
     )
-    fig_gantt.update_yaxes(autorange="reversed", title="", automargin=True)
+    fig_gantt.update_yaxes(autorange="reversed", title="", automargin=True, tickfont=dict(size=11))
     style_plotly_chart(fig_gantt)
     fig_gantt.update_layout(
-        margin=dict(l=10, r=10, t=40, b=10), height=max(200, 55 * len(gantt_df)),
+        margin=dict(l=10, r=10, t=40, b=10), height=hauteur_graphique_wrap(gantt_df["titre_wrap"], len(gantt_df)),
         legend_title="",
     )
     st.plotly_chart(fig_gantt, use_container_width=True)
@@ -508,9 +508,9 @@ else:
     fig_perf.update_layout(
         xaxis_title="Performance moyenne (%)", yaxis_title="",
         xaxis_range=[0, 112],
-        margin=dict(l=10, r=10, t=20, b=10), height=max(200, 45 * len(perf_df)),
+        margin=dict(l=10, r=10, t=20, b=10), height=hauteur_graphique_wrap(perf_df["responsable_wrap"], len(perf_df)),
         showlegend=False,
-        yaxis=dict(automargin=True),
+        yaxis=dict(automargin=True, tickfont=dict(size=11)),
     )
     st.plotly_chart(fig_perf, use_container_width=True)
 

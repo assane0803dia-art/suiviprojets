@@ -19,7 +19,13 @@ st.title(t("reports_title"))
 st.caption(t("reports_subtitle"))
 st.divider()
 
-projets_df = crud.get_projets()
+is_lecteur = user.get("role") == "lecteur"
+if is_lecteur:
+    projets_df = crud.get_projets_accessibles(user["id"])
+elif user.get("compte_restreint"):
+    projets_df = crud.get_projets_restreints(user["id"])
+else:
+    projets_df = crud.get_projets()
 
 if projets_df.empty:
     st.info("Aucun projet pour l'instant.")

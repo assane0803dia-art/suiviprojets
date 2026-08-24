@@ -126,18 +126,20 @@ def update_last_project(user_id, projet_id):
 def _redirect_after_login(user):
     """
     Envoie l'utilisateur directement dans son espace de travail après connexion :
-    - vers la création de projet s'il n'en a aucun (ou aucun accès, pour un lecteur)
-    - vers son dernier projet consulté sinon, avec la première section déjà ouverte
+    - vers la création de projet s'il n'en a aucun (ou aucun accès, pour un lecteur/compte restreint)
+    - vers son dernier projet consulté sinon
     """
     import crud  # import local pour éviter tout risque de dépendance circulaire
 
     if user["role"] == "lecteur":
         projets_df = crud.get_projets_accessibles(user["id"])
+    elif user.get("compte_restreint"):
+        projets_df = crud.get_projets_restreints(user["id"])
     else:
         projets_df = crud.get_projets()
 
     if projets_df.empty:
-        if user["role"] == "lecteur":
+        if user["role"] == "lecteur" or user.get("compte_restreint"):
             st.switch_page("pages/2_📂_Mes_Projets.py")
         else:
             st.switch_page("pages/1_📁_Nouveau_Projet.py")
@@ -148,7 +150,6 @@ def _redirect_after_login(user):
     target_id = dernier_id if dernier_id in ids_disponibles else ids_disponibles[0]
 
     st.session_state["jump_to_projet_id"] = target_id
-    st.session_state["hub_active_section"] = "objectifs"
     st.switch_page("pages/2_📂_Mes_Projets.py")
 
 

@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from auth import require_login, logout_button, get_last_project
-from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip, wrap_label, hauteur_graphique_wrap
+from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip, wrap_label, hauteur_graphique_wrap, truncate_label
 from i18n import t
 from indicators_config import (
     load_all_indicators,
@@ -225,7 +225,8 @@ else:
         st.markdown("**📐 Progression vers la cible**")
         st.caption("Chaque barre = l'avancement actuel en % de la cible (100% = cible atteinte). Le repère ⚪ indique le point de départ (baseline).")
 
-        noms = [wrap_label(i["nom"]) for i in indicateurs_avec_donnees]
+        noms = [truncate_label(i["nom"]) for i in indicateurs_avec_donnees]
+        noms_complets = [i["nom"] for i in indicateurs_avec_donnees]
         pct_actuel = [min((i["actuelle"] or 0) / i["cible"] * 100, 130) for i in indicateurs_avec_donnees]
         pct_baseline = [(i["baseline"] or 0) / i["cible"] * 100 for i in indicateurs_avec_donnees]
         couleurs = [i["statut"][1] for i in indicateurs_avec_donnees]
@@ -238,10 +239,11 @@ else:
             x=pct_actuel, y=noms, orientation="h",
             marker_color=couleurs_hex, text=textes, textposition="outside",
             showlegend=False,  # légende gérée séparément ci-dessous (couleurs multiples par statut)
+            customdata=noms_complets, hovertemplate="<b>%{customdata}</b><br>%{x:.0f}% de la cible<extra></extra>",
         ))
         fig_evolution.add_trace(go.Scatter(
             x=pct_baseline, y=noms, mode="markers", marker=dict(symbol="circle", size=10, color="white", line=dict(color="#94A3B8", width=2)),
-            name="Baseline (point de départ)",
+            name="Baseline (point de départ)", hoverinfo="skip",
         ))
         fig_evolution.add_vline(x=100, line_dash="dash", line_color="#94A3B8", annotation_text="Cible (100%)", annotation_position="top")
 
@@ -259,7 +261,7 @@ else:
 
         style_plotly_chart(fig_evolution)
         fig_evolution.update_layout(
-            margin=dict(l=10, r=10, t=30, b=10), height=hauteur_graphique_wrap(noms, len(indicateurs_avec_donnees)),
+            margin=dict(l=10, r=10, t=30, b=10), height=max(220, 32 * len(indicateurs_avec_donnees)),
             xaxis_title="% de la cible atteint", yaxis_title="", showlegend=True,
             yaxis=dict(automargin=True, tickfont=dict(size=11)),
         )
@@ -386,16 +388,19 @@ if not graphiques.empty:
             if not activites_avec_budget.empty:
                 nb_sans_budget = len(activites_df) - len(activites_avec_budget)
                 activites_avec_budget = activites_avec_budget.copy()
-                activites_avec_budget["titre_wrap"] = activites_avec_budget["titre"].apply(wrap_label)
+                activites_avec_budget["titre_court"] = activites_avec_budget["titre"].apply(truncate_label)
+                activites_avec_budget = activites_avec_budget.sort_values("budget", ascending=True)
                 fig = px.bar(
-                    activites_avec_budget.sort_values("budget", ascending=True),
-                    x="budget", y="titre_wrap", orientation="h",
+                    activites_avec_budget,
+                    x="budget", y="titre_court", orientation="h",
                     text_auto=",.0f", color_discrete_sequence=["#2563EB"],
+                    custom_data=["titre"],
                 )
+                fig.update_traces(hovertemplate="<b>%{customdata[0]}</b><br>Budget : %{x:,.0f} FCFA<extra></extra>")
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Budget (FCFA)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=hauteur_graphique_wrap(activites_avec_budget["titre_wrap"], len(activites_avec_budget)),
+                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 32 * len(activites_avec_budget)),
                     yaxis=dict(automargin=True, tickfont=dict(size=11)),
                 )
                 st.plotly_chart(fig, use_container_width=True)
@@ -407,17 +412,20 @@ if not graphiques.empty:
         elif row["cle"] == "graph_progression_projet":
             if not activites_df.empty and "progression" in activites_df.columns:
                 activites_prog = activites_df.copy()
-                activites_prog["titre_wrap"] = activites_prog["titre"].apply(wrap_label)
+                activites_prog["titre_court"] = activites_prog["titre"].apply(truncate_label)
+                activites_prog = activites_prog.sort_values("progression", ascending=True)
                 fig = px.bar(
-                    activites_prog.sort_values("progression", ascending=True),
-                    x="progression", y="titre_wrap", orientation="h",
+                    activites_prog,
+                    x="progression", y="titre_court", orientation="h",
                     text_auto=".0f", color="progression",
                     color_continuous_scale=["#F59E0B", "#10B981"], range_color=[0, 100],
+                    custom_data=["titre"],
                 )
+                fig.update_traces(hovertemplate="<b>%{customdata[0]}</b><br>Progression : %{x:.0f}%<extra></extra>")
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Progression (%)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=hauteur_graphique_wrap(activites_prog["titre_wrap"], len(activites_prog)),
+                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 32 * len(activites_prog)),
                     coloraxis_showscale=False,
                     yaxis=dict(automargin=True, tickfont=dict(size=11)),
                 )
@@ -444,22 +452,23 @@ else:
 
     chemin_critique_ids = critical_path.compute_critical_path(activites_df)
     gantt_df["chemin"] = gantt_df["id"].apply(lambda x: "🔴 Chemin critique" if x in chemin_critique_ids else "Autres activités")
-    gantt_df["titre_wrap"] = gantt_df["titre"].apply(wrap_label)
+    gantt_df["titre_court"] = gantt_df["titre"].apply(truncate_label)
 
     tip("gantt_chemin_critique", "Le chemin critique (en rouge) est la séquence d'activités qui détermine la durée totale du projet — tout retard sur l'une d'elles retarde le projet entier. Renseignez le champ « Dépend de » sur vos activités pour le faire apparaître.")
 
     fig_gantt = px.timeline(
-        gantt_df, x_start="date_debut", x_end="date_fin", y="titre_wrap",
+        gantt_df, x_start="date_debut", x_end="date_fin", y="titre_court",
         color="chemin", color_discrete_map={
             "🔴 Chemin critique": "#EF4444", "Autres activités": "#93C5FD",
         },
-        category_orders={"titre_wrap": gantt_df["titre_wrap"].tolist()},
-        hover_data={"statut": True},
+        category_orders={"titre_court": gantt_df["titre_court"].tolist()},
+        custom_data=["titre", "statut"],
     )
+    fig_gantt.update_traces(hovertemplate="<b>%{customdata[0]}</b><br>Statut : %{customdata[1]}<br>%{base|%d/%m/%Y} → %{x|%d/%m/%Y}<extra></extra>")
     fig_gantt.update_yaxes(autorange="reversed", title="", automargin=True, tickfont=dict(size=11))
     style_plotly_chart(fig_gantt)
     fig_gantt.update_layout(
-        margin=dict(l=10, r=10, t=40, b=10), height=hauteur_graphique_wrap(gantt_df["titre_wrap"], len(gantt_df)),
+        margin=dict(l=10, r=10, t=40, b=10), height=max(200, 32 * len(gantt_df)),
         legend_title="",
     )
     st.plotly_chart(fig_gantt, use_container_width=True)
@@ -486,21 +495,21 @@ if perf_df.empty:
 else:
     perf_df = perf_df.sort_values("performance_moyenne", ascending=True)
     perf_df["performance_moyenne"] = perf_df["performance_moyenne"].round(1)
-    perf_df["responsable_wrap"] = perf_df["responsable"].apply(wrap_label)
+    perf_df["responsable_court"] = perf_df["responsable"].apply(truncate_label)
 
     fig_perf = px.bar(
-        perf_df, x="performance_moyenne", y="responsable_wrap", orientation="h",
+        perf_df, x="performance_moyenne", y="responsable_court", orientation="h",
         text_auto=".0f", color_discrete_sequence=["#2563EB"],
-        custom_data=["nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard", "nb_a_venir"],
+        custom_data=["responsable", "nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard", "nb_a_venir"],
     )
     fig_perf.update_traces(textposition="outside")  # sans ça, une barre à 0% n'affiche aucune étiquette
     fig_perf.update_traces(
         hovertemplate=(
-            "<b>%{y}</b><br>"
+            "<b>%{customdata[0]}</b><br>"
             "Performance moyenne : %{x:.0f}%<br>"
-            "Activités assignées : %{customdata[0]}<br>"
-            "Terminées : %{customdata[1]} · En cours : %{customdata[2]}<br>"
-            "En retard : %{customdata[3]} · Pas encore commencées : %{customdata[4]}"
+            "Activités assignées : %{customdata[1]}<br>"
+            "Terminées : %{customdata[2]} · En cours : %{customdata[3]}<br>"
+            "En retard : %{customdata[4]} · Pas encore commencées : %{customdata[5]}"
             "<extra></extra>"
         )
     )
@@ -508,7 +517,7 @@ else:
     fig_perf.update_layout(
         xaxis_title="Performance moyenne (%)", yaxis_title="",
         xaxis_range=[0, 112],
-        margin=dict(l=10, r=10, t=20, b=10), height=hauteur_graphique_wrap(perf_df["responsable_wrap"], len(perf_df)),
+        margin=dict(l=10, r=10, t=20, b=10), height=max(200, 32 * len(perf_df)),
         showlegend=False,
         yaxis=dict(automargin=True, tickfont=dict(size=11)),
     )

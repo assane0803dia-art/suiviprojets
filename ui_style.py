@@ -23,6 +23,23 @@ def wrap_label(texte, largeur=42):
     return "<br>".join(textwrap.wrap(str(texte), width=largeur, break_long_words=False))
 
 
+def truncate_label(texte, longueur=45):
+    """
+    Version compacte d'un libellé long : une seule ligne, tronquée avec une
+    ellipse si nécessaire. À utiliser avec un hovertemplate qui affiche le
+    texte complet au survol (customdata) — rien n'est perdu, seul l'affichage
+    par défaut est raccourci, pour garder des lignes compactes et uniformes
+    sur les graphiques à beaucoup de catégories (évite le défilement excessif
+    qu'entraîne le retour à la ligne systématique — voir wrap_label).
+    """
+    if not texte:
+        return texte
+    texte = str(texte)
+    if len(texte) <= longueur:
+        return texte
+    return texte[:longueur - 1].rstrip() + "…"
+
+
 def hauteur_graphique_wrap(labels_wrappes, nb_categories, px_par_ligne=20, min_par_categorie=42):
     """
     Calcule la hauteur nécessaire pour un graphique horizontal dont les

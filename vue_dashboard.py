@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from auth import require_login, logout_button, get_last_project
-from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip
+from ui_style import sidebar_brand, kpi_card_html, section_title, badge_html, style_plotly_chart, tip, wrap_label
 from i18n import t
 from indicators_config import (
     load_all_indicators,
@@ -225,7 +225,7 @@ else:
         st.markdown("**📐 Progression vers la cible**")
         st.caption("Chaque barre = l'avancement actuel en % de la cible (100% = cible atteinte). Le repère ⚪ indique le point de départ (baseline).")
 
-        noms = [i["nom"] for i in indicateurs_avec_donnees]
+        noms = [wrap_label(i["nom"]) for i in indicateurs_avec_donnees]
         pct_actuel = [min((i["actuelle"] or 0) / i["cible"] * 100, 130) for i in indicateurs_avec_donnees]
         pct_baseline = [(i["baseline"] or 0) / i["cible"] * 100 for i in indicateurs_avec_donnees]
         couleurs = [i["statut"][1] for i in indicateurs_avec_donnees]
@@ -385,15 +385,17 @@ if not graphiques.empty:
             activites_avec_budget = activites_df[activites_df["budget"].notna() & (activites_df["budget"] > 0)] if not activites_df.empty else activites_df
             if not activites_avec_budget.empty:
                 nb_sans_budget = len(activites_df) - len(activites_avec_budget)
+                activites_avec_budget = activites_avec_budget.copy()
+                activites_avec_budget["titre_wrap"] = activites_avec_budget["titre"].apply(wrap_label)
                 fig = px.bar(
                     activites_avec_budget.sort_values("budget", ascending=True),
-                    x="budget", y="titre", orientation="h",
+                    x="budget", y="titre_wrap", orientation="h",
                     text_auto=",.0f", color_discrete_sequence=["#2563EB"],
                 )
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Budget (FCFA)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 42 * len(activites_avec_budget)),
+                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 55 * len(activites_avec_budget)),
                     yaxis=dict(automargin=True),
                 )
                 st.plotly_chart(fig, use_container_width=True)
@@ -404,16 +406,18 @@ if not graphiques.empty:
 
         elif row["cle"] == "graph_progression_projet":
             if not activites_df.empty and "progression" in activites_df.columns:
+                activites_prog = activites_df.copy()
+                activites_prog["titre_wrap"] = activites_prog["titre"].apply(wrap_label)
                 fig = px.bar(
-                    activites_df.sort_values("progression", ascending=True),
-                    x="progression", y="titre", orientation="h",
+                    activites_prog.sort_values("progression", ascending=True),
+                    x="progression", y="titre_wrap", orientation="h",
                     text_auto=".0f", color="progression",
                     color_continuous_scale=["#F59E0B", "#10B981"], range_color=[0, 100],
                 )
                 style_plotly_chart(fig)
                 fig.update_layout(
                     xaxis_title="Progression (%)", yaxis_title="",
-                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 42 * len(activites_df)),
+                    margin=dict(l=10, r=10, t=40, b=10), height=max(280, 55 * len(activites_prog)),
                     coloraxis_showscale=False,
                     yaxis=dict(automargin=True),
                 )
@@ -440,21 +444,22 @@ else:
 
     chemin_critique_ids = critical_path.compute_critical_path(activites_df)
     gantt_df["chemin"] = gantt_df["id"].apply(lambda x: "🔴 Chemin critique" if x in chemin_critique_ids else "Autres activités")
+    gantt_df["titre_wrap"] = gantt_df["titre"].apply(wrap_label)
 
     tip("gantt_chemin_critique", "Le chemin critique (en rouge) est la séquence d'activités qui détermine la durée totale du projet — tout retard sur l'une d'elles retarde le projet entier. Renseignez le champ « Dépend de » sur vos activités pour le faire apparaître.")
 
     fig_gantt = px.timeline(
-        gantt_df, x_start="date_debut", x_end="date_fin", y="titre",
+        gantt_df, x_start="date_debut", x_end="date_fin", y="titre_wrap",
         color="chemin", color_discrete_map={
             "🔴 Chemin critique": "#EF4444", "Autres activités": "#93C5FD",
         },
-        category_orders={"titre": gantt_df["titre"].tolist()},
+        category_orders={"titre_wrap": gantt_df["titre_wrap"].tolist()},
         hover_data={"statut": True},
     )
     fig_gantt.update_yaxes(autorange="reversed", title="", automargin=True)
     style_plotly_chart(fig_gantt)
     fig_gantt.update_layout(
-        margin=dict(l=10, r=10, t=40, b=10), height=max(200, 40 * len(gantt_df)),
+        margin=dict(l=10, r=10, t=40, b=10), height=max(200, 55 * len(gantt_df)),
         legend_title="",
     )
     st.plotly_chart(fig_gantt, use_container_width=True)
@@ -481,9 +486,10 @@ if perf_df.empty:
 else:
     perf_df = perf_df.sort_values("performance_moyenne", ascending=True)
     perf_df["performance_moyenne"] = perf_df["performance_moyenne"].round(1)
+    perf_df["responsable_wrap"] = perf_df["responsable"].apply(wrap_label)
 
     fig_perf = px.bar(
-        perf_df, x="performance_moyenne", y="responsable", orientation="h",
+        perf_df, x="performance_moyenne", y="responsable_wrap", orientation="h",
         text_auto=".0f", color_discrete_sequence=["#2563EB"],
         custom_data=["nb_activites", "nb_terminees", "nb_en_cours", "nb_en_retard", "nb_a_venir"],
     )

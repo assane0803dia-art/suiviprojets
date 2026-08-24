@@ -6,6 +6,21 @@ pour une interface cohérente sur toutes les pages de l'application.
 import streamlit as st
 import streamlit.components.v1 as components
 import uuid
+import textwrap
+
+
+def wrap_label(texte, largeur=35):
+    """
+    Insère des retours à la ligne (<br>, compris par Plotly) dans un libellé
+    long, à des coupures de mots propres — plutôt que de laisser Plotly
+    agrandir indéfiniment la marge gauche (ce qui écrase la zone du graphique
+    à droite) ou de tronquer l'information. Utilisé sur les axes de tous les
+    graphiques horizontaux à libellés potentiellement longs (activités,
+    indicateurs, responsables...).
+    """
+    if not texte:
+        return texte
+    return "<br>".join(textwrap.wrap(str(texte), width=largeur, break_long_words=False))
 
 # ----------------------------------------------------------------------------
 # Palette de couleurs (inspirée des outils modernes de gestion de projet)

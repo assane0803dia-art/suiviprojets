@@ -237,13 +237,25 @@ else:
         fig_evolution.add_trace(go.Bar(
             x=pct_actuel, y=noms, orientation="h",
             marker_color=couleurs_hex, text=textes, textposition="outside",
-            name="Avancement actuel",
+            showlegend=False,  # légende gérée séparément ci-dessous (couleurs multiples par statut)
         ))
         fig_evolution.add_trace(go.Scatter(
             x=pct_baseline, y=noms, mode="markers", marker=dict(symbol="circle", size=10, color="white", line=dict(color="#94A3B8", width=2)),
-            name="Baseline",
+            name="Baseline (point de départ)",
         ))
         fig_evolution.add_vline(x=100, line_dash="dash", line_color="#94A3B8", annotation_text="Cible (100%)", annotation_position="top")
+
+        # Légende par statut — une entrée par couleur réellement utilisée dans les barres,
+        # avec le même seuil que le reste de l'application (cohérence globale)
+        legende_statuts = [
+            ("success", "#10B981", "🟢 ≥ 100% (cible atteinte)"),
+            ("muted", "#2563EB", "🔵 60-99% (bonne progression)"),
+            ("warning", "#F59E0B", "🟠 30-59% (attention)"),
+            ("danger", "#EF4444", "🔴 < 30% (critique)"),
+        ]
+        for kind, couleur, label in legende_statuts:
+            if kind in couleurs:  # n'affiche que les statuts réellement présents dans le graphique
+                fig_evolution.add_trace(go.Bar(x=[None], y=[None], marker_color=couleur, name=label, showlegend=True))
 
         style_plotly_chart(fig_evolution)
         fig_evolution.update_layout(

@@ -67,21 +67,24 @@ if "import_extraction" in st.session_state and not st.session_state.get("import_
         p["devise"] = devise_val or None
 
     st.write("")
-    objectifs = extraction.get("objectifs", [])
+    st.markdown("**🎯 Objectif général**")
+    st.caption("Unique, énoncé de haut niveau — ne porte pas de résultats directement.")
+    objectif_general = extraction.setdefault("objectif_general", {})
+    objectif_general["titre"] = st.text_input("Titre de l'objectif général", value=objectif_general.get("titre") or "")
+    objectif_general["description"] = st.text_area("Description", value=objectif_general.get("description") or "", height=68)
+
+    st.write("")
+    objectifs = extraction.setdefault("objectifs_specifiques", [])
     if not objectifs:
-        st.info("Aucun objectif n'a pu être extrait — vous pourrez les ajouter manuellement après la création du projet.")
+        st.info("Aucun objectif spécifique n'a pu être extrait — vous pourrez en ajouter manuellement après la création du projet.")
 
     objectifs_a_supprimer = []
     for i_obj, obj in enumerate(objectifs):
         with st.container(border=True):
             col_obj1, col_obj2 = st.columns([5, 1])
             with col_obj1:
-                obj["titre"] = st.text_input(f"Objectif {i_obj + 1} — Titre", value=obj.get("titre") or "", key=f"obj_titre_{i_obj}")
-                obj["type_objectif"] = st.selectbox(
-                    "Type", ["Général", "Spécifique"],
-                    index=0 if obj.get("type_objectif") == "Général" else 1,
-                    key=f"obj_type_{i_obj}",
-                )
+                obj["titre"] = st.text_input(f"Objectif spécifique {i_obj + 1} — Titre", value=obj.get("titre") or "", key=f"obj_titre_{i_obj}")
+                obj["description"] = st.text_area("Description", value=obj.get("description") or "", key=f"obj_desc_{i_obj}", height=68)
             with col_obj2:
                 st.write("")
                 st.write("")

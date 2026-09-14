@@ -59,9 +59,12 @@ SCHEMA_ATTENDU = """{
     "budget": nombre ou null,
     "devise": "FCFA, EUR, USD... ou null"
   },
-  "objectifs": [
+  "objectif_general": {
+    "titre": "string",
+    "description": "string ou null"
+  },
+  "objectifs_specifiques": [
     {
-      "type_objectif": "Général ou Spécifique",
       "titre": "string",
       "description": "string ou null",
       "resultats": [
@@ -93,15 +96,24 @@ def _construire_prompt(texte_document: str) -> str:
 On te fournit le texte d'un document décrivant un projet (document de projet, proposition,
 rapport de suivi...). Ta tâche : extraire sa structure en JSON, selon le schéma ci-dessous.
 
-RÈGLES STRICTES (le plus important) :
+RÈGLE DE HIÉRARCHIE IMPORTANTE (source d'erreurs fréquentes) :
+- L'objectif général est UNIQUE et NE PORTE JAMAIS de résultats directement — c'est un énoncé
+  d'impact de haut niveau (une phrase du type "Consolider...", "Contribuer à...", "Améliorer...").
+- Les résultats attendus (produits, effets) doivent TOUJOURS être rattachés à un objectif
+  SPÉCIFIQUE, jamais à l'objectif général. S'il n'y a qu'un seul objectif spécifique explicite
+  dans le document, crée-le quand même comme un objectif spécifique distinct portant les
+  résultats — ne les remonte pas sur l'objectif général par simplicité.
+- Si le document ne distingue pas clairement plusieurs objectifs spécifiques mais présente
+  directement des résultats/produits sous l'objectif général, crée UN SEUL objectif spécifique
+  (reprenant par exemple le même énoncé que l'objectif général, ou une formulation proche) pour
+  y rattacher ces résultats — c'est le bon endroit dans la hiérarchie de cet outil.
+
+RÈGLES STRICTES SUR LE CONTENU :
 - N'INVENTE JAMAIS une valeur qui n'est pas explicitement présente dans le document.
 - Si une information est absente ou ambiguë, mets `null` — ne devine pas, n'estime pas,
   ne complète pas "pour que ça ait l'air complet".
 - Les nombres (budget, baseline, cible) doivent être des valeurs EXACTES du document,
   jamais des arrondis ou des approximations de ta part.
-- Si le document ne présente pas clairement d'objectifs/résultats/activités séparés,
-  fais de ton mieux pour structurer selon ce qui est écrit, sans inventer de hiérarchie
-  qui ne serait pas dans le texte.
 - Réponds UNIQUEMENT avec le JSON, sans texte avant ou après, sans balises markdown.
 
 SCHÉMA ATTENDU :

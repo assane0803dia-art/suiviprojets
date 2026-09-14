@@ -1144,8 +1144,11 @@ FREQUENCES_VENTILATION = ["aucune", "hebdomadaire", "mensuelle", "trimestrielle"
 # ----------------------------------------------------------------------------
 def create_projet_depuis_extraction(extraction: dict) -> int:
     """
-    Crée un projet complet (objectifs, résultats, activités) à partir d'une
-    structure extraite et validée par l'utilisateur. Retourne l'id du projet créé.
+    Crée un projet complet (objectif général, objectifs spécifiques, résultats,
+    activités) à partir d'une structure extraite et validée par l'utilisateur.
+    L'objectif général ne porte jamais de résultats directement — seuls les
+    objectifs spécifiques en portent, conformément à la hiérarchie de l'outil.
+    Retourne l'id du projet créé.
     """
     p = extraction["projet"]
     projet_id = create_projet(
@@ -1153,13 +1156,16 @@ def create_projet_depuis_extraction(extraction: dict) -> int:
         p.get("date_debut"), p.get("date_fin"), p.get("budget"), "Planifié", None,
     )
 
-    for obj in extraction.get("objectifs", []):
-        objectif_id = create_objectif(projet_id, obj.get("type_objectif") or "Spécifique", obj.get("titre") or "Objectif", None)
-        # La description d'objectif n'a pas de colonne dédiée dans le schéma actuel
-        # (Objectifs n'a que titre/type_objectif/responsable_id) — elle est
-        # reportée dans le résultat si utile, ou simplement non conservée.
+    objectif_general = extraction.get("objectif_general") or {}
+    if objectif_general.get("titre"):
+        create_objectif(projet_id, "Général", objectif_general["titre"], None)
+        # La description de l'objectif général n'a pas de colonne dédiée dans le
+        # schéma actuel (Objectifs n'a que titre/type_objectif/responsable_id).
 
-        for res in obj.get("resultats", []):
+    for obj_spec in extraction.get("objectifs_specifiques", []):
+        objectif_id = create_objectif(projet_id, "Spécifique", obj_spec.get("titre") or "Objectif spécifique", None)
+
+        for res in obj_spec.get("resultats", []):
             resultat_id = create_resultat(
                 objectif_id, res.get("titre") or "Résultat", res.get("description"),
                 res.get("indicateur"), res.get("valeur_cible"), None, res.get("unite"), "En cours",

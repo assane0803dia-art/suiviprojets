@@ -17,6 +17,7 @@ if _user:
 pg = st.navigation([
     st.Page("vue_dashboard.py", title=t("nav_dashboard"), icon="🏠", default=True),
     st.Page("pages/1_📁_Nouveau_Projet.py", title=t("nav_new_project"), icon="📁"),
+    st.Page("pages/7_📥_Importer_un_projet.py", title="Importer un projet", icon="📥"),
     st.Page("pages/2_📂_Mes_Projets.py", title=t("nav_my_projects"), icon="📂"),
     st.Page("pages/3_📊_Rapports.py", title=t("nav_reports"), icon="📊"),
     st.Page("pages/4_🤖_IA.py", title=t("nav_ai"), icon="🤖"),

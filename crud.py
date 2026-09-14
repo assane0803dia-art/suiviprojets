@@ -814,23 +814,26 @@ def get_depenses(activite_id):
 @st.cache_data(ttl=15)
 def get_depenses_by_projet(projet_id):
     return run_query(
-        """SELECT D.id, D.montant, D.date_depense, D.description,
+        """SELECT D.id, D.montant, D.date_depense, D.description, D.projet_id,
                   A.id AS activite_id, A.titre AS activite_titre, A.budget AS budget_prevu
            FROM Depenses D
-           JOIN Activites A ON D.activite_id = A.id
-           JOIN Resultats R ON A.resultat_id = R.id
-           JOIN Objectifs O ON R.objectif_id = O.id
-           WHERE O.projet_id = %s
-           ORDER BY A.titre, D.date_depense""",
+           LEFT JOIN Activites A ON D.activite_id = A.id
+           LEFT JOIN Resultats R ON A.resultat_id = R.id
+           LEFT JOIN Objectifs O ON R.objectif_id = O.id
+           WHERE COALESCE(O.projet_id, D.projet_id) = %s
+           ORDER BY A.titre NULLS LAST, D.date_depense""",
         params=(projet_id,),
     )
 
 
-def create_depense(activite_id, montant, date_depense, description):
+def create_depense(activite_id, montant, date_depense, description, projet_id=None):
+    """activite_id peut être None pour une dépense de coordination générale non
+    rattachée à une activité précise — projet_id devient alors obligatoire pour
+    savoir à quel projet elle appartient."""
     new_id = run_execute(
-        "INSERT INTO Depenses (activite_id, montant, date_depense, description) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
-        (activite_id, montant, date_depense, description),
+        "INSERT INTO Depenses (activite_id, montant, date_depense, description, projet_id) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (activite_id, montant, date_depense, description, projet_id),
     )
     get_depenses_by_projet.clear()
     return new_id
@@ -1132,6 +1135,44 @@ def get_toutes_periodes_projet(projet_id):
 
 
 FREQUENCES_VENTILATION = ["aucune", "hebdomadaire", "mensuelle", "trimestrielle", "semestrielle", "annuelle"]
+
+
+# ----------------------------------------------------------------------------
+# Import de projet depuis une extraction IA (déjà relue/corrigée par
+# l'utilisateur dans l'écran de vérification — cette fonction ne fait
+# qu'écrire ce qui lui est donné, elle ne réinterprète rien)
+# ----------------------------------------------------------------------------
+def create_projet_depuis_extraction(extraction: dict) -> int:
+    """
+    Crée un projet complet (objectifs, résultats, activités) à partir d'une
+    structure extraite et validée par l'utilisateur. Retourne l'id du projet créé.
+    """
+    p = extraction["projet"]
+    projet_id = create_projet(
+        p.get("nom") or "Projet importé", p.get("description"),
+        p.get("date_debut"), p.get("date_fin"), p.get("budget"), "Planifié", None,
+    )
+
+    for obj in extraction.get("objectifs", []):
+        objectif_id = create_objectif(projet_id, obj.get("type_objectif") or "Spécifique", obj.get("titre") or "Objectif", None)
+        # La description d'objectif n'a pas de colonne dédiée dans le schéma actuel
+        # (Objectifs n'a que titre/type_objectif/responsable_id) — elle est
+        # reportée dans le résultat si utile, ou simplement non conservée.
+
+        for res in obj.get("resultats", []):
+            resultat_id = create_resultat(
+                objectif_id, res.get("titre") or "Résultat", res.get("description"),
+                res.get("indicateur"), res.get("valeur_cible"), None, res.get("unite"), "En cours",
+                baseline=res.get("baseline"),
+            )
+
+            for act in res.get("activites", []):
+                create_activite(
+                    resultat_id, act.get("titre") or "Activité", act.get("description"), None,
+                    act.get("date_debut"), act.get("date_fin"), "À faire", act.get("budget"), 0,
+                )
+
+    return projet_id
 
 
 # ----------------------------------------------------------------------------

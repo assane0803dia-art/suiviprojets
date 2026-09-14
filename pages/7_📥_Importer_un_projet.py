@@ -79,6 +79,7 @@ if "import_extraction" in st.session_state and not st.session_state.get("import_
         st.info("Aucun objectif spécifique n'a pu être extrait — vous pourrez en ajouter manuellement après la création du projet.")
 
     objectifs_a_supprimer = []
+    numero_resultat_continu = 0
     for i_obj, obj in enumerate(objectifs):
         with st.container(border=True):
             col_obj1, col_obj2 = st.columns([5, 1])
@@ -94,7 +95,8 @@ if "import_extraction" in st.session_state and not st.session_state.get("import_
             resultats = obj.get("resultats", [])
             resultats_a_supprimer = []
             for i_res, res in enumerate(resultats):
-                st.markdown(f"　**↳ Résultat {i_res + 1}**")
+                numero_resultat_continu += 1
+                st.markdown(f"　**↳ Résultat {numero_resultat_continu}**")
                 rc1, rc2 = st.columns([5, 1])
                 with rc1:
                     res["titre"] = st.text_input("Titre du résultat", value=res.get("titre") or "", key=f"res_titre_{i_obj}_{i_res}")
@@ -112,7 +114,7 @@ if "import_extraction" in st.session_state and not st.session_state.get("import_
                 activites = res.get("activites", [])
                 activites_a_supprimer = []
                 for i_act, act in enumerate(activites):
-                    st.markdown(f"　　**↳↳ Activité {i_act + 1}**")
+                    st.markdown(f"　　**↳↳ Activité {numero_resultat_continu}.{i_act + 1}**")
                     ac1, ac2 = st.columns([5, 1])
                     with ac1:
                         act["titre"] = st.text_input("Titre de l'activité", value=act.get("titre") or "", key=f"act_titre_{i_obj}_{i_res}_{i_act}")

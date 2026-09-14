@@ -131,18 +131,28 @@ def extraire_structure_projet(texte_document: str, model: str = "claude-sonnet-5
     client = anthropic.Anthropic(api_key=api_key)
     response = client.messages.create(
         model=model,
-        max_tokens=4000,
+        max_tokens=8000,
         messages=[{"role": "user", "content": _construire_prompt(texte_document)}],
     )
     texte_reponse = "".join(block.text for block in response.content if hasattr(block, "text"))
 
     # Au cas où l'IA ajouterait malgré tout des balises markdown autour du JSON
-    texte_reponse = re.sub(r"^```(?:json)?\s*|\s*```$", "", texte_reponse.strip())
+    texte_nettoye = re.sub(r"^```(?:json)?\s*|\s*```$", "", texte_reponse.strip())
 
     try:
-        return json.loads(texte_reponse)
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"L'IA n'a pas retourné un JSON valide — réessayez, ou le document est peut-être "
-            f"trop désorganisé pour une extraction automatique. Détail technique : {e}"
-        )
+        return json.loads(texte_nettoye)
+    except json.JSONDecodeError:
+        # Erreur la plus fréquente : une virgule superflue juste avant une accolade/crochet
+        # fermant (ex: dernier élément d'une liste) — on tente une réparation ciblée avant
+        # d'abandonner, plutôt que d'échouer sur un défaut aussi mineur et fréquent.
+        texte_repare = re.sub(r",(\s*[}\]])", r"\1", texte_nettoye)
+        try:
+            return json.loads(texte_repare)
+        except json.JSONDecodeError as e:
+            # Conserve la réponse brute pour que l'écran d'import puisse l'afficher —
+            # utile pour comprendre ce qui a précisément posé problème.
+            st.session_state["import_derniere_reponse_brute"] = texte_reponse
+            raise ValueError(
+                f"L'IA n'a pas retourné un JSON valide — réessayez, ou le document est peut-être "
+                f"trop désorganisé pour une extraction automatique. Détail technique : {e}"
+            )

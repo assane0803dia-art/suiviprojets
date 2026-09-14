@@ -35,6 +35,9 @@ if uploaded_file and st.button("🤖 Analyser avec l'IA", type="primary"):
             st.toast("✅ Extraction terminée — vérifiez les informations ci-dessous avant de créer le projet.")
         except (RuntimeError, ValueError) as e:
             st.error(str(e))
+            if "import_derniere_reponse_brute" in st.session_state:
+                with st.expander("🔍 Voir la réponse brute de l'IA (pour diagnostic)"):
+                    st.code(st.session_state["import_derniere_reponse_brute"], language="text")
         except Exception as e:
             st.error(f"Erreur inattendue lors de l'extraction : {e}")
 
